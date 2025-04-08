@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:3000');
+const socket = io('http://localhost:3001');
 
 const Timer = ({laneId}) => {
     const [time, setTime] = useState(0);
@@ -41,8 +41,8 @@ const Timer = ({laneId}) => {
     }
 
     const handleStop = () => {
-        socket.emit('stop-timer');
-    }
+        socket.emit('stop-timer', laneId); // Emit the stop event with laneId
+    };    
 
     return(
         <div>

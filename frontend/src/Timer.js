@@ -1,57 +1,50 @@
-import React, {useState, useEffect} from 'react';
-import io from 'socket.io-client';
+import { useState, useEffect } from 'react';
 
-const socket = io('http://localhost:3001');
+const Timer = ({ laneId, socket, isAdmin }) => {
+  const [time, setTime] = useState(0);
+  const [running, setRunning] = useState(false);
 
-const Timer = ({laneId}) => {
-    const [time, setTime] = useState(0);
-    const [running, setRunning] = useState(false);
+  useEffect(() => {
+    socket.on('start-timer', () => setRunning(true));
+    socket.on('stop-timer', (stoppedLane) => {
+      if (stoppedLane === laneId) setRunning(false);
+    });
 
-    useEffect(() => {
-        socket.on('start-timer', ()=>{
-            setRunning(true);
-        });
+    return () => {
+      socket.off('start-timer');
+      socket.off('stop-timer');
+    };
+  }, [socket, laneId]);
 
-        socket.on('stop-timer', (laneIdToStop)=>{
-            if(laneIdToStop === laneId){
-                setRunning(false);
-            }
-        });
-
-        return ()=>{
-            socket.off('start-timer');
-            socket.off('stop-timer');
-        };
-    },[laneId]);
-
-    useEffect(()=>{
-        let interval;
-        if(running){
-            interval = setInterval(()=>{
-                setTime((prevTime)=>prevTime+1);
-            }, 1000);
-        } else{
-            clearInterval(interval);
-        }
-        return () => clearInterval(interval);
-    }, [running]);
-
-    const handleStart = () => {
-        socket.emit('start-timer');
+  useEffect(() => {
+    let interval;
+    if (running) {
+      interval = setInterval(() => setTime((t) => t + 1), 1000);
+    } else {
+      clearInterval(interval);
     }
+    return () => clearInterval(interval);
+  }, [running]);
 
-    const handleStop = () => {
-        socket.emit('stop-timer', laneId); // Emit the stop event with laneId
-    };    
+  const handleStart = () => {
+    if (isAdmin) socket.emit('start-timer');
+  };
 
-    return(
-        <div>
-            <h3>Lane {laneId}</h3>
-            <p>Time: {time} seconds</p>
-            <button onClick={handleStart}>Start</button>
-            <button onClick={handleStop}>Stop</button>
-        </div>
-    );
+  const handleStop = () => {
+    if (!isAdmin) socket.emit('stop-timer', laneId);
+  };
+
+  return (
+    <div>
+      <h3>Lane {laneId}</h3>
+      <p>Time: {time}s</p>
+      {isAdmin ? (
+        <button onClick={handleStart}>Start</button>
+      ) : (
+        <button onClick={handleStop}>Stop</button>
+      )}
+    </div>
+  );
 };
 
 export default Timer;

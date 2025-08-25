@@ -20,6 +20,8 @@ function App() {
   const [role, setRole] = useState('');
   const [passcode, setPasscode] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
+  const [start, setStart] = useState(false);
+  const [finish, setFinish] = useState(false);
 
   const handleLogin = () => {
     if (ROLE_PASSCODES[role] !== passcode) {
@@ -35,6 +37,20 @@ function App() {
       }
     });
   };
+
+  const handleStart = () => {
+    socket.emit('start-timer');
+    setStart(true);
+  }
+  const handleStop = () => {
+    socket.emit('stop-all-timers');
+    setFinish(true);
+  }
+  const handleSave = () => {
+    socket.emit('reset-all-timers');
+    setFinish(false);
+    setStart(false);
+  }
 
   if (!authenticated) {
     return (
@@ -62,9 +78,17 @@ function App() {
     <div className="App">
       <h1>Race Timer ({role})</h1>
       {role === 'admin' ? (
-        [...Array(8)].map((_, i) => (
-          <Timer key={i} laneId={i + 1} socket={socket} isAdmin={true} />
-        ))
+        <div>
+          {finish ? 
+            <button onClick={handleSave}>Save</button> : 
+            (start ? <button onClick={handleStop}>Stop All</button> : <button onClick={handleStart}>Start</button>)
+          }
+          {
+            [...Array(8)].map((_, i) => (
+              <Timer key={i} laneId={i + 1} socket={socket} isAdmin={true} />
+            ))
+          }
+        </div>
       ) : (
         <Timer
           laneId={parseInt(role.split('-')[1])}

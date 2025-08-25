@@ -29,6 +29,10 @@ function App() {
       return;
     }
 
+    if(socket.disconnected){
+      socket.connect();
+    }
+
     socket.emit('request-role', role, (response) => {
       if (response.success) {
         setAuthenticated(true);
@@ -50,6 +54,11 @@ function App() {
     socket.emit('reset-all-timers');
     setFinish(false);
     setStart(false);
+  }
+
+  const handleLogout = () => {
+    socket.disconnect();
+    setAuthenticated(false);
   }
 
   if (!authenticated) {
@@ -96,6 +105,7 @@ function App() {
           isAdmin={false}
         />
       )}
+      <button onClick={handleLogout}>Log out</button>
     </div>
   );
 }

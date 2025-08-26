@@ -8,18 +8,19 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",  // Allow frontend to connect
+    origin: "http://localhost:3000",
     methods: ["GET", "POST"]
   }
 });
 
-app.use(cors());  // Enable CORS for all routes
+app.use(cors());
 app.use(bodyParser.json());
 
-let roleAssignments = {}; // socketId: role
+let roleAssignments = {}; // socketId -> role
 let roleLocks = new Set(); // roles in use
+let startTimestamp = null; // timestamp for running timers
+let laneElapsed = Array(8).fill(0); // stores elapsed time per lane in ms
 
-// Handling WebSocket connections
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
@@ -34,41 +35,55 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Admin starts all timers
   socket.on('start-timer', () => {
     if (roleAssignments[socket.id] === 'admin') {
-      io.emit('start-timer');
+      startTimestamp = Date.now();
+      laneElapsed = Array(8).fill(0);
+      io.emit('start-timer', { startTimestamp });
       console.log('Admin started all timers');
-    } else {
-      console.log(`Unauthorized start attempt by ${socket.id}`);
     }
   });
 
+  // Lane stops their own timer
   socket.on('stop-timer', (laneId) => {
     const expectedRole = `lane-${laneId}`;
     if (roleAssignments[socket.id] === expectedRole) {
-      io.emit('stop-timer', laneId);
-      console.log(`Lane ${laneId} stopped by ${socket.id}`);
-    } else {
-      console.log(`Unauthorized stop attempt for lane ${laneId} by ${socket.id}`);
+      const elapsed = Date.now() - startTimestamp;
+      laneElapsed[laneId - 1] = elapsed;
+      io.emit('stop-timer', { laneId, elapsed });
+      console.log(`Lane ${laneId} stopped. Elapsed: ${elapsed}`);
     }
   });
 
+  // Admin stops any lane
   socket.on('admin-stop-lane', (laneId) => {
     if (roleAssignments[socket.id] === 'admin') {
-      io.emit('stop-timer', laneId);
-      console.log(`Admin stopped lane ${laneId}`);
+      const elapsed = Date.now() - startTimestamp;
+      laneElapsed[laneId - 1] = elapsed;
+      io.emit('stop-timer', { laneId, elapsed });
+      console.log(`Admin stopped lane ${laneId}. Elapsed: ${elapsed}`);
     }
   });
 
-  socket.on('stop-all-timers', ()=>{
-    io.emit('stop-all-timers');
-    console.log('Admin stopped all timers');
+  // Admin stops all lanes
+  socket.on('stop-all-timers', () => {
+    const now = Date.now();
+    laneElapsed = laneElapsed.map((time, i) =>
+      time || now - startTimestamp
+    );
+    const elapsedCopy = [...laneElapsed];
+    io.emit('stop-all-timers', { elapsed: elapsedCopy });
+    console.log('Admin stopped all timers', elapsedCopy);
   });
 
-  socket.on('reset-all-timers', ()=>{
+  // Admin resets all timers
+  socket.on('reset-all-timers', () => {
+    startTimestamp = null;
+    laneElapsed = Array(8).fill(0);
     io.emit('reset-all-timers');
-    console.log('Admin resetted all tiemrs');
-  })
+    console.log('Admin reset all timers');
+  });
 
   socket.on('disconnect', () => {
     const role = roleAssignments[socket.id];
@@ -80,7 +95,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start the server
 server.listen(3001, () => {
-  console.log('Server is running on port 3001');
+  console.log('Server running on port 3001');
 });

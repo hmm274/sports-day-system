@@ -1,54 +1,62 @@
 import { useState, useEffect } from 'react';
 
 const Timer = ({ laneId, socket, isAdmin }) => {
-  const [time, setTime] = useState(0);
+  const [elapsed, setElapsed] = useState(0); // milliseconds
   const [running, setRunning] = useState(false);
+  const [startTime, setStartTime] = useState(null);
 
+  // Listen for server events
   useEffect(() => {
-    // Listen for global start
-    socket.on('start-timer', () => setRunning(true));
+    // Start all timers
+    const handleStart = ({ startTimestamp }) => {
+      setStartTime(startTimestamp);
+      setRunning(true);
+    };
 
-    // Listen for lane-specific stop
-    socket.on('stop-timer', (stoppedLane) => {
-      if (stoppedLane === laneId) setRunning(false);
-    });
+    // Stop a specific lane
+    const handleStopLane = ({ laneId: stoppedLaneId, elapsed }) => {
+      if (stoppedLaneId === laneId) {
+        setElapsed(elapsed);
+        setRunning(false);
+      }
+    };
 
-    socket.on('stop-all-timers', () => setRunning(false));
-
-    socket.on('reset-all-timers', () => {
+    // Stop all timers
+    const handleStopAll = ({ elapsed: allElapsed }) => {
+      setElapsed(allElapsed[laneId - 1] || 0);
       setRunning(false);
-      setTime(0);
-    });
+    };
+
+    // Reset all timers
+    const handleReset = () => {
+      setElapsed(0);
+      setStartTime(null);
+      setRunning(false);
+    };
+
+    socket.on('start-timer', handleStart);
+    socket.on('stop-timer', handleStopLane);
+    socket.on('stop-all-timers', handleStopAll);
+    socket.on('reset-all-timers', handleReset);
 
     return () => {
-      socket.off('start-timer');
-      socket.off('stop-timer');
-      socket.off('stop-all-timers');
-      socket.off('reset-all-timers');
+      socket.off('start-timer', handleStart);
+      socket.off('stop-timer', handleStopLane);
+      socket.off('stop-all-timers', handleStopAll);
+      socket.off('reset-all-timers', handleReset);
     };
   }, [socket, laneId]);
 
+  // Update elapsed time continuously using wall-clock
   useEffect(() => {
     let interval;
-    if (running) {
-      interval = setInterval(() => setTime((t) => t + 10), 1);
-    } else {
-      clearInterval(interval);
+    if (running && startTime !== null) {
+      interval = setInterval(() => {
+        setElapsed(Date.now() - startTime);
+      }, 50); // 50ms is enough for smooth display
     }
     return () => clearInterval(interval);
-  }, [running]);
-
-  // Lane user stops their own lane
-  const handleStop = () => {
-    if (!isAdmin) socket.emit('stop-timer', laneId);
-    setRunning(false);
-  };
-
-  // Admin emergency stops any lane
-  const handleAdminStop = () => {
-    if (isAdmin) socket.emit('admin-stop-lane', laneId);
-    setRunning(false);
-  };
+  }, [running, startTime]);
 
   const formatTime = (ms) => {
     const seconds = Math.floor(ms / 1000);
@@ -56,19 +64,28 @@ const Timer = ({ laneId, socket, isAdmin }) => {
     return `${seconds}.${milliseconds.toString().padStart(3, '0')}s`;
   };
 
-  return (
-    <div>
-      <h3>Lane {laneId}</h3>
-      <p>Time: {formatTime(time)}</p>
+  // Lane stops their own timer
+  const handleStop = () => {
+    if (!isAdmin) socket.emit('stop-timer', laneId);
+    setRunning(false);
+  };
 
-      {(isAdmin && running) && (
-        <div>
-          <button onClick={handleAdminStop}>Stop</button>
-        </div>
+  // Admin stops this lane
+  const handleAdminStop = () => {
+    if (isAdmin) socket.emit('admin-stop-lane', laneId);
+    setRunning(false);
+  };
+
+  return (
+    <div style={{ marginBottom: '10px', padding: '5px', border: '1px solid #ccc', borderRadius: '4px' }}>
+      <h4>Lane {laneId}</h4>
+      <p>Time: {formatTime(elapsed)}</p>
+
+      {running && isAdmin && (
+        <button onClick={handleAdminStop}>Stop</button>
       )}
 
-      {(!isAdmin && running) && (
-        // Lane user stop
+      {running && !isAdmin && (
         <button onClick={handleStop}>Stop</button>
       )}
     </div>

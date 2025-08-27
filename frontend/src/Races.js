@@ -16,7 +16,8 @@ export default function Races() {
           race_id,
           race_event,
           race_results (
-            result_id,
+            race_id,
+            student_id,
             time,
             students (
               student_id,

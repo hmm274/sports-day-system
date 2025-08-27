@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const Timer = ({ laneId, socket, isAdmin }) => {
+const Timer = ({ laneId, socket, isAdmin, onStop }) => {
   const [elapsed, setElapsed] = useState(0); // milliseconds
   const [running, setRunning] = useState(false);
   const [startTime, setStartTime] = useState(null);
@@ -18,13 +18,16 @@ const Timer = ({ laneId, socket, isAdmin }) => {
       if (stoppedLaneId === laneId) {
         setElapsed(elapsed);
         setRunning(false);
+        onStop(laneId,(elapsed/1000));
       }
     };
 
     // Stop all timers
     const handleStopAll = ({ elapsed: allElapsed }) => {
-      setElapsed(allElapsed[laneId - 1] || 0);
+      const laneTime=(allElapsed[laneId-1]||0);
+      setElapsed(laneTime);
       setRunning(false);
+      onStop(laneId,(laneTime/1000));
     };
 
     // Reset all timers
@@ -45,7 +48,7 @@ const Timer = ({ laneId, socket, isAdmin }) => {
       socket.off('stop-all-timers', handleStopAll);
       socket.off('reset-all-timers', handleReset);
     };
-  }, [socket, laneId]);
+  }, [socket, laneId, onStop]);
 
   // Update elapsed time continuously using wall-clock
   useEffect(() => {

@@ -23,77 +23,80 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave}) => {
   const [races, setRaces] = useState([]);
   const [selectedRaceId, setSelectedRaceId] = useState(null);
   const [laneStudents, setLaneStudents] = useState([]); // array of student objects per lane
+  const [timers, setTimers] = useState({});
+
+  const fetchRaces = async () => {
+    const { data: raceData, error: raceError } = await supabase
+      .from('races')
+      .select('*')
+      .order('race_id', { ascending: true });
+
+    if (raceError) {
+      console.error('Error fetching races:', raceError);
+      return;
+    }
+
+    // Fetch students for each race to display in dropdown
+    const racesWithNames = await Promise.all(
+      raceData.map(async (race) => {
+        const { data: resultsData } = await supabase
+          .from('race_results')
+          .select(`
+            student:student_id (
+              first_name
+            )
+          `)
+          .is('time',null)
+          .eq('race_id', race.race_id);
+
+        const names = resultsData?.map((r) => r.student.first_name).join(', ') || '';
+        return { ...race, studentNames: names };
+      })
+    );
+
+    setRaces(racesWithNames.filter(r => r.studentNames !== ''));
+  };
 
   // Fetch all races along with student names for dropdown display
   useEffect(() => {
-    const fetchRaces = async () => {
-      const { data: raceData, error: raceError } = await supabase
-        .from('races')
-        .select('*')
-        .order('race_id', { ascending: true });
-
-      if (raceError) {
-        console.error('Error fetching races:', raceError);
-        return;
-      }
-
-      // Fetch students for each race to display in dropdown
-      const racesWithNames = await Promise.all(
-        raceData.map(async (race) => {
-          const { data: resultsData } = await supabase
-            .from('race_results')
-            .select(`
-              student:student_id (
-                first_name
-              )
-            `)
-            .eq('race_id', race.race_id);
-
-          const names = resultsData?.map((r) => r.student.first_name).join(', ') || '';
-          return { ...race, studentNames: names };
-        })
-      );
-
-      setRaces(racesWithNames);
-    };
-
     fetchRaces();
   }, []);
 
   // Fetch lane students whenever a race is selected
+  const fetchLaneStudents = async () => {
+    if (!selectedRaceId) {
+      setLaneStudents([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('race_results')
+      .select(`
+        lane,
+        student:student_id (
+          student_id,
+          first_name,
+          last_name,
+          house
+        )
+      `)
+      .eq('race_id', selectedRaceId)
+      .is('time',null)
+      .order('lane', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching lane students:', error);
+      setLaneStudents([]);
+    } else {
+      const lanes = Array(8).fill(null);
+      data.forEach((entry) => {
+        lanes[entry.lane - 1] = entry.student;
+      });
+      setLaneStudents(lanes);
+    }
+  };
+
   useEffect(() => {
-    const fetchLaneStudents = async () => {
-      if (!selectedRaceId) {
-        setLaneStudents([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('race_results')
-        .select(`
-          lane,
-          student:student_id (
-            student_id,
-            first_name,
-            last_name,
-            house
-          )
-        `)
-        .eq('race_id', selectedRaceId)
-        .order('lane', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching lane students:', error);
-        setLaneStudents([]);
-      } else {
-        const lanes = Array(8).fill(null);
-        data.forEach((entry) => {
-          lanes[entry.lane - 1] = entry.student;
-        });
-        setLaneStudents(lanes);
-      }
-    };
-
     fetchLaneStudents();
   }, [selectedRaceId]);
 
@@ -118,7 +121,7 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave}) => {
       <div style={{ marginBottom: '15px' }}>
         <button onClick={handleStart}>Start All</button>
         <button onClick={handleStop}>Stop All</button>
-        <button onClick={handleSave}>Reset / Save</button>
+        <button onClick={()=>handleSave(selectedRaceId, timers, fetchRaces, fetchLaneStudents)}>Reset / Save</button>
       </div>
       <div>
         {[...Array(8)].map((_, i) => {
@@ -135,6 +138,9 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave}) => {
                 isAdmin={true}
                 selectedRaceId={selectedRaceId}
                 studentId={student?.student_id || null}
+                onStop={(lane, time) => {
+                  setTimers((prev) => ({ ...prev, [lane]: { studentId: student?.student_id, time } }));
+                }}
               />
             </div>
           );
@@ -175,9 +181,56 @@ function App() {
   const handleStop = () => {
     socket.emit('stop-all-timers');
   }
-  const handleSave = () => {
-    socket.emit('reset-all-timers');
-  }
+  const handleSave = async (selectedRaceId, timers, fetchRaces, fetchLaneStudents) => {
+    try {
+      // Convert timers to results array
+      let results = Object.entries(timers).map(([lane, data]) => ({
+        race_id: selectedRaceId,
+        student_id: data.studentId,
+        lane: parseInt(lane),
+        time: data.time
+      }));
+
+      // Sort results by time (ascending = fastest first)
+      results.sort((a, b) => a.time - b.time);
+
+      // Assign points based on placement
+      results = results.map((res, index) => {
+        let points = 5; // default for 5th place and under
+        if (index === 0) points = 40;
+        else if (index === 1) points = 30;
+        else if (index === 2) points = 20;
+        else if (index === 3) points = 10;
+
+        return { ...res, points };
+      });
+
+      console.log("Saving results:", results);
+
+      // Upsert into race_results with points
+      const { data, error } = await supabase
+        .from('race_results')
+        .upsert(results, { onConflict: ['race_id', 'student_id'] });
+
+      if (error) {
+        console.error("Error saving results:", error);
+        alert("Failed to save results");
+      } else {
+        console.log(data);
+        alert("Results saved!");
+        if (fetchRaces) {
+          await fetchRaces();
+        }
+        if (fetchLaneStudents) {
+          await fetchLaneStudents();
+        }
+        socket.emit("reset-all-timers");
+      }
+    } catch (err) {
+      console.error("Unexpected error saving results:", err);
+    }
+  };
+
 
   const handleLogout = () => {
     socket.disconnect();

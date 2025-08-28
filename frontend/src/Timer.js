@@ -18,7 +18,9 @@ const Timer = ({ laneId, socket, isAdmin, onStop }) => {
       if (stoppedLaneId === laneId) {
         setElapsed(elapsed);
         setRunning(false);
-        onStop(laneId,(elapsed/1000));
+        if (onStop){
+          onStop(laneId,(elapsed/1000))
+        };
       }
     };
 
@@ -27,7 +29,9 @@ const Timer = ({ laneId, socket, isAdmin, onStop }) => {
       const laneTime=(allElapsed[laneId-1]||0);
       setElapsed(laneTime);
       setRunning(false);
-      onStop(laneId,(laneTime/1000));
+      if(onStop){
+        onStop(laneId,(laneTime/1000))
+      };
     };
 
     // Reset all timers

@@ -10,7 +10,7 @@ export default function HousePoints() {
   });
 
   const fetchPoints = async () => {
-    const { data, error } = await supabase
+    const { data: raceData, error: raceError } = await supabase
       .from("race_results")
       .select(`
         points,
@@ -19,18 +19,35 @@ export default function HousePoints() {
         )
       `);
 
-    if (error) {
-      console.error("Error fetching points:", error);
+    const {data: fieldData,error: fieldError} = await supabase
+      .from("field_results")
+      .select(`
+        points,
+        student:student_id (
+          house
+        )
+      `);
+
+    if (raceError) {
+      console.error("Error fetching points:", raceError);
       return;
+    }
+    if(fieldError){
+      console.error("Error fetching points: ", fieldError);
     }
 
     const totals = { Suzaku: 0, Seiryuu: 0, Genbu: 0, Byakko: 0 };
 
-    data.forEach((result) => {
+    raceData?.forEach((result) => {
       if (result.student?.house) {
         totals[result.student.house] += result.points || 0;
       }
     });
+    fieldData?.forEach((result)=>{
+      if(result.student?.house){
+        totals[result.student.house]+=result.points || 0;
+      }
+    })
 
     setPoints(totals);
   };
@@ -39,7 +56,7 @@ export default function HousePoints() {
     fetchPoints();
 
     // Subscribe to realtime changes in race_results
-    const channel = supabase
+    const raceChannel = supabase
       .channel("race_results-changes")
       .on(
         "postgres_changes",
@@ -50,8 +67,20 @@ export default function HousePoints() {
       )
       .subscribe();
 
+    const fieldChannel = supabase
+      .channel("field_results-changes")
+      .on(
+        "postgres_changes",
+        { event:"*", schema:"public", table:"field_results"},
+        ()=>{
+          fetchPoints();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(raceChannel);
+      supabase.removeChannel(fieldChannel);
     };
   }, []);
 

@@ -7,6 +7,7 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
   const [selectedRaceId, setSelectedRaceId] = useState(null);
   const [laneStudents, setLaneStudents] = useState([]); // array of student objects per lane
   const [timers, setTimers] = useState({});
+  const [noResult, setNoResult] = useState({});
 
   const fetchRaces = async () => {
     const { data: raceData, error: raceError } = await supabase
@@ -104,7 +105,7 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
       <div style={{ marginBottom: '15px' }}>
         <button onClick={handleStart}>Start All</button>
         <button onClick={handleStop}>Stop All</button>
-        <button onClick={()=>handleSave(selectedRaceId, timers, fetchRaces, fetchLaneStudents)}>Reset / Save</button>
+        <button onClick={()=>handleSave(selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult)}>Reset / Save</button>
       </div>
       <div>
         {[...Array(8)].map((_, i) => {
@@ -115,6 +116,23 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
                 Lane {i + 1}{' '}
                 {student ? `- ${student.first_name} ${student.last_name} (${student.house})` : ''}
               </h4>
+
+              {student && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={!!noResult[i + 1]}
+                    onChange={(e) =>
+                      setNoResult((prev) => ({
+                        ...prev,
+                        [i + 1]: e.target.checked,
+                      }))
+                    }
+                  />
+                  No Result
+                </label>
+              )}
+
               <Timer
                 laneId={i + 1}
                 socket={socket}

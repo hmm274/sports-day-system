@@ -54,21 +54,30 @@ function App() {
   const handleStop = () => {
     socket.emit('stop-all-timers');
   }
-  const handleSave = async (selectedRaceId, timers, fetchRaces, fetchLaneStudents) => {
+  const handleSave = async (selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult) => {
     try {
       // Convert timers to results array
       let results = Object.entries(timers).map(([lane, data]) => ({
         race_id: selectedRaceId,
         student_id: data.studentId,
         lane: parseInt(lane),
-        time: data.time
+        time: data.time,
+        no_result: !!noResult[lane]
       }));
 
       // Sort results by time (ascending = fastest first)
-      results.sort((a, b) => a.time - b.time);
+      results.sort((a, b) => {
+        if (a.no_result && !b.no_result) return 1;
+        if (!a.no_result && b.no_result) return -1;
+        return a.time - b.time
+      });
 
       // Assign points based on placement
       results = results.map((res, index) => {
+        if (res.no_result){
+          return {...res, points: 0}
+        }
+
         let points = 5; // default for 5th place and under
         if (index === 0) points = 40;
         else if (index === 1) points = 30;

@@ -9,6 +9,7 @@ export default function FieldManager() {
   const [students, setStudents] = useState([]);
   const [distances, setDistances] = useState({}); // { [fieldId]: { [studentId]: value } }
   const [lockedInputs, setLockedInputs] = useState({}); // { [fieldId]: { [studentId]: true } }
+  const [noResult, setNoResult] = useState({});
 
   // Fetch field_id whenever event, grade, and gender are selected
   useEffect(() => {
@@ -91,14 +92,19 @@ export default function FieldManager() {
   }, [fieldId, grade, gender]);
 
   const handleSetDistance = async (studentId) => {
-    const rawValue = distances[fieldId]?.[studentId];
-    const distance = parseFloat(rawValue?.trim().replace(",", "."));
-    if (isNaN(distance)) return alert("Enter a valid number");
+    const no_result = noResult[fieldId]?.[studentId];
+    let distance = null;
+
+    if (!no_result){
+      const rawValue = distances[fieldId]?.[studentId];
+      distance = parseFloat(rawValue?.trim().replace(",", "."));
+      if (isNaN(distance)) return alert("Enter a valid number");
+    }
 
     // 1. Insert or update the field result
     const { error: insertError } = await supabase
         .from("field_results")
-        .upsert([{ field_id: fieldId, student_id: studentId, distance }], {
+        .upsert([{ field_id: fieldId, student_id: studentId, distance: no_result ? null : distance, points: no_result ? 0 : null, no_result: no_result ? no_result : false }], {
         onConflict: ["field_id", "student_id"],
         });
 
@@ -124,9 +130,9 @@ export default function FieldManager() {
         console.error(resultsError);
         return;
     }
-
+    const validResults = results.filter(r => !(noResult[fieldId]?.[r.student_id]));
     // 4. Sort descending by distance
-    const sorted = results.sort((a, b) => b.distance - a.distance);
+    const sorted = validResults.sort((a, b) => b.distance - a.distance);
 
     // 5. Assign points based on rank
     const pointsMap = {};
@@ -205,7 +211,7 @@ export default function FieldManager() {
                 step="0.01"
                 className="border p-1 mr-2"
                 value={distances[fieldId]?.[student.student_id] || ""}
-                readOnly={lockedInputs[fieldId]?.[student.student_id]}
+                readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.studentId]}
                 onChange={(e) =>
                   setDistances({
                     ...distances,
@@ -213,6 +219,20 @@ export default function FieldManager() {
                   })
                 }
               />
+              <label className="mr-2">
+                <input
+                  type="checkbox"
+                  checked={noResult[fieldId]?.[student.student_id] || false}
+                  disabled={lockedInputs[fieldId]?.[student.student_id]}
+                  onChange={(e) =>
+                    setNoResult(prev => ({
+                      ...prev,
+                      [fieldId]: { ...prev[fieldId], [student.student_id]: e.target.checked }
+                    }))
+                  }
+                />{" "}
+                No Result
+              </label>
               {!lockedInputs[fieldId]?.[student.student_id] && (
                 <button
                   className="bg-blue-500 text-white px-3 py-1 rounded"

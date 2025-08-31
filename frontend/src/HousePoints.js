@@ -85,14 +85,10 @@ export default function HousePoints() {
   }, []);
 
   return (
-    <div className="grid grid-cols-2 gap-4 p-4">
+    <div>
       {Object.entries(points).map(([house, score]) => (
-        <div
-          key={house}
-          className="p-4 bg-white rounded-2xl shadow-md flex justify-between items-center"
-        >
-          <span className="font-bold text-lg">{house}: </span>
-          <span className="text-xl">{score}</span>
+        <div key={house}>
+          <h1>{house}: {score}</h1>
         </div>
       ))}
     </div>

@@ -146,7 +146,6 @@ export default function Admin() {
   return (
     <div style={{ padding: "20px" }}>
       <h2>Setup New Race</h2>
-
       <div style={{ marginBottom: "10px" }}>
         <label>Event:</label>
         <select

@@ -12,6 +12,7 @@ const socket = io('http://localhost:3001');
 
 const ROLE_PASSCODES = {
   admin: 'admin123',
+  field: 'field123',
   'lane-1': 'lane1pass',
   'lane-2': 'lane2pass',
   'lane-3': 'lane3pass',
@@ -28,6 +29,7 @@ function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [adminAction, setAdminAction] = useState('none');
   const [field, setField] = useState(false);
+  const [points, setPoints] = useState(false);
 
   const handleLogin = () => {
     if (ROLE_PASSCODES[role] !== passcode) {
@@ -35,17 +37,22 @@ function App() {
       return;
     }
 
-    if(socket.disconnected){
-      socket.connect();
-    }
-
-    socket.emit('request-role', role, (response) => {
-      if (response.success) {
-        setAuthenticated(true);
-      } else {
-        alert(response.message);
+    if (role!=="field"){
+      if(socket.disconnected){
+        socket.connect();
       }
-    });
+
+      socket.emit('request-role', role, (response) => {
+        if (response.success) {
+          setAuthenticated(true);
+        } else {
+          alert(response.message);
+        }
+      });
+    }else{
+      setAuthenticated(true);
+      setField(true);
+    }
   };
 
   const handleStart = () => {
@@ -118,22 +125,30 @@ function App() {
     socket.disconnect();
     setAuthenticated(false);
     setAdminAction('none');
+    setField(false);
   }
 
-  const goToField = () =>{
-    setField(true);
+  const handleUndo = () => {
+    setPoints(false);
+    setAdminAction("none");
   }
 
   if (!authenticated) {
-    if (field) {
-      return <FieldManager />
-    } else {
+    if (points){
+      return(
+        <div>
+          <HousePoints />
+          <button onClick={handleUndo}>Back</button>
+        </div>
+      );
+    } else{
       return (
         <div className="App">
-          <h1>Race Timer Login</h1>
+          <h1>Login</h1>
           <select value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="">Select Role</option>
             <option value="admin">Admin</option>
+            <option value="field">Field</option>
             {[...Array(8)].map((_, i) => (
               <option key={i} value={`lane-${i + 1}`}>Lane {i + 1}</option>
             ))}
@@ -144,17 +159,25 @@ function App() {
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
           />
-          <button onClick={handleLogin}>Login</button>
-          <button onClick={goToField}>Field Event</button>
-          <HousePoints />
+          <button onClick={handleLogin}>Login</button><br /><br />
+          <button onClick={()=>{setPoints(true)}}>View House Points</button>
         </div>
       );
     }
   }
 
+  if(field){
+    return(
+      <div>
+        <FieldManager />
+        <button onClick={handleLogout}>Log out</button>
+      </div>
+    );
+  }
+
   return (
     <div className="App">
-      <h1>Race Timer ({role})</h1>
+      <h1>{role.charAt(0).toUpperCase() + role.slice(1)}</h1>
       {role === 'admin' ? (
         <div>
         {adminAction==='none' ?
@@ -182,6 +205,7 @@ function App() {
           isAdmin={false}
         />
       )}
+      {(adminAction!=="none" && !field) && <button onClick={handleUndo}>Back</button>}
       <button onClick={handleLogout}>Log out</button>
     </div>
   );

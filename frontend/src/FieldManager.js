@@ -164,11 +164,9 @@ export default function FieldManager() {
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Field Event Entry</h2>
-
+    <div>
+      <h2>Field Event Entry</h2>
       <select
-        className="border p-2 mr-2"
         value={eventType}
         onChange={(e) => handleEventType(e.target.value)}
       >
@@ -178,7 +176,6 @@ export default function FieldManager() {
       </select>
 
       <select
-        className="border p-2 mr-2"
         value={grade}
         onChange={(e) => setGrade(e.target.value)}
       >
@@ -189,7 +186,6 @@ export default function FieldManager() {
       </select>
 
       <select
-        className="border p-2"
         value={gender}
         onChange={(e) => setGender(e.target.value)}
       >
@@ -199,17 +195,14 @@ export default function FieldManager() {
       </select>
 
       {students.length > 0 && (
-        <div className="mt-6">
-          <h3 className="font-semibold mb-2">Enter Distances</h3>
+        <div>
+          <h3>Enter Distances</h3>
           {students.map((student) => (
-            <div key={student.student_id} className="flex items-center mb-2">
-              <span className="w-40">
-                {student.first_name} {student.last_name}
-              </span>
+            <div key={student.student_id}>
+              <span>{student.first_name} {student.last_name}</span>
               <input
                 type="number"
                 step="0.01"
-                className="border p-1 mr-2"
                 value={distances[fieldId]?.[student.student_id] || ""}
                 readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.studentId]}
                 onChange={(e) =>
@@ -219,7 +212,7 @@ export default function FieldManager() {
                   })
                 }
               />
-              <label className="mr-2">
+              <label>
                 <input
                   type="checkbox"
                   checked={noResult[fieldId]?.[student.student_id] || false}
@@ -231,13 +224,10 @@ export default function FieldManager() {
                     }))
                   }
                 />{" "}
-                No Result
+                NR
               </label>
               {!lockedInputs[fieldId]?.[student.student_id] && (
-                <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded"
-                  onClick={() => handleSetDistance(student.student_id)}
-                >
+                <button onClick={() => handleSetDistance(student.student_id)}>
                   Set
                 </button>
               )}

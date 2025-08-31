@@ -87,7 +87,6 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
   return (
     <div style={{ padding: '20px' }}>
       <h2>Manage Timers</h2>
-
       <div style={{ marginBottom: '15px' }}>
         <label>Select Race: </label>
         <select

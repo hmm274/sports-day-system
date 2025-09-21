@@ -7,6 +7,7 @@ import { supabase } from './supabaseClient';
 import AdminManageTimer from './AdminManageTimer';
 import HousePoints from './HousePoints';
 import FieldManager from './FieldManager';
+import './App.css';
 
 const socket = io('http://localhost:3001');
 
@@ -143,24 +144,26 @@ function App() {
       );
     } else{
       return (
-        <div className="App">
-          <h1>Login</h1>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="">Select Role</option>
-            <option value="admin">Admin</option>
-            <option value="field">Field</option>
-            {[...Array(8)].map((_, i) => (
-              <option key={i} value={`lane-${i + 1}`}>Lane {i + 1}</option>
-            ))}
-          </select>
-          <input
-            type="password"
-            placeholder="Passcode"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
-          />
-          <button onClick={handleLogin}>Login</button><br /><br />
-          <button onClick={()=>{setPoints(true)}}>View House Points</button>
+        <div className="Login">
+          <div className="box">
+            <h1>Sports Day</h1>
+            <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <option value="">Select Role</option>
+              <option value="admin">Admin</option>
+              <option value="field">Field</option>
+              {[...Array(8)].map((_, i) => (
+                <option key={i} value={`lane-${i + 1}`}>Lane {i + 1}</option>
+              ))}
+            </select><br />
+            <input
+              type="password"
+              placeholder="Passcode"
+              value={passcode}
+              onChange={(e) => setPasscode(e.target.value)}
+            /><br />
+            <button onClick={handleLogin}>Login</button><br /><br />
+            <button onClick={()=>{setPoints(true)}}>View House Points</button>
+          </div>
         </div>
       );
     }
@@ -177,13 +180,14 @@ function App() {
 
   return (
     <div className="App">
-      <h1>{role.charAt(0).toUpperCase() + role.slice(1)}</h1>
       {role === 'admin' ? (
         <div>
         {adminAction==='none' ?
           <div>
-            <button onClick={()=>setAdminAction('set')}>Set Races</button>
-            <button onClick={()=>setAdminAction('manage')}>Manage Timer</button>
+            <div className="menu">
+              <button onClick={()=>setAdminAction('set')}>Set Races</button>
+              <button onClick={()=>setAdminAction('manage')}>Timer</button>
+            </div>
             <Races />
           </div> :
           <div>
@@ -205,8 +209,10 @@ function App() {
           isAdmin={false}
         />
       )}
-      {(adminAction!=="none" && !field) && <button onClick={handleUndo}>Back</button>}
-      <button onClick={handleLogout}>Log out</button>
+      <div className="button-logout">
+        {(adminAction!=="none" && !field) && <button className="button-logout-1" onClick={handleUndo}>Back</button>}
+        <button onClick={handleLogout}>Log out</button>
+      </div>
     </div>
   );
 }

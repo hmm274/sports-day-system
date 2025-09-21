@@ -18,6 +18,7 @@ export default function Races() {
           race_results (
             race_id,
             student_id,
+            lane,
             time,
             no_result,
             students (
@@ -54,22 +55,34 @@ export default function Races() {
         {races.map((race) => (
           <li key={race.race_id}>
             <h3>
-              {race.race_event} (Race ID: {race.race_id})
+              {race.race_event}
             </h3>
-            {race.race_results && race.race_results.length > 0 ? (
-              <ul>
-                {race.race_results.map((result) => (
-                  <li key={result.result_id}>
-                    {result.students.first_name} {result.students.last_name} |{" "}
-                    Grade {result.students.grade} | {result.students.sex} |{" "}
-                    House: {result.students.house}{" "}
-                    {!result.no_result ? `| Time: ${result.time}` : "| No Result"}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No students assigned yet.</p>
-            )}
+            <table>
+              <thead>
+                <th>Lane</th>
+                <th>Name</th>
+                <th>Grade</th>
+                <th>Sex</th>
+                <th>House</th>
+                <th>Time</th>
+              </thead>
+              {race.race_results && race.race_results.length > 0 ? (
+                <tbody>
+                  {race.race_results.map((result) => (
+                    <tr key={result.result_id}>
+                      <td>{result.lane}</td>
+                      <td>{result.students.first_name} {result.students.last_name}</td>
+                      <td>{result.students.grade}</td>
+                      <td>{result.students.sex}</td>
+                      <td>{result.students.house}</td>
+                      <td>{!result.no_result ? result.time : "No Result"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              ) : (
+                <p>No students assigned yet.</p>
+              )}
+            </table>
           </li>
         ))}
       </ul>

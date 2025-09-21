@@ -8,6 +8,47 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
   const [laneStudents, setLaneStudents] = useState([]); // array of student objects per lane
   const [timers, setTimers] = useState({});
   const [noResult, setNoResult] = useState({});
+  const [raceStatus, setRaceStatus] = useState("idle"); 
+  // "idle" | "running" | "finished"
+  const [activeTimers, setActiveTimers] = useState(0);
+
+  const onStartAll = () => {
+    handleStart();
+    setRaceStatus("running");
+    setActiveTimers(laneStudents.filter(Boolean).length); // number of students in race
+  };
+
+  const onStopAll = () => {
+    handleStop(); // stops all timers in TimerGroup
+
+    // mark all currently running lanes as finished with their time = null
+    setTimers((prev) => {
+      const updated = { ...prev };
+      laneStudents.forEach((student, lane) => {
+        if (student && !updated[lane]) {
+          updated[lane] = { studentId: student.student_id, time: null };
+        }
+      });
+      return updated;
+    });
+
+    setActiveTimers(0);        // no timers left running
+    setRaceStatus("finished"); // mark race as complete
+  };
+
+  const onReset = async() => {
+    handleStop();
+    await handleSave(selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult); 
+
+    // clear all recorded times
+    setTimers({});
+
+    // reset active timers count
+    setActiveTimers(0);
+
+    // set race back to idle state
+    setRaceStatus("idle");
+  };
 
   const fetchRaces = async () => {
     const { data: raceData, error: raceError } = await supabase
@@ -101,21 +142,16 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
           ))}
         </select>
       </div>
-      <div style={{ marginBottom: '15px' }}>
-        <button onClick={handleStart}>Start All</button>
-        <button onClick={handleStop}>Stop All</button>
-        <button onClick={()=>handleSave(selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult)}>Reset / Save</button>
+      <div className="timer-options">
+        <button onClick={onStartAll} disabled={!selectedRaceId || raceStatus!=="idle"}>Start All</button>
+        <button onClick={onStopAll} disabled={!selectedRaceId || raceStatus!=="running"}>Stop All</button>
+        <button onClick={onReset} disabled={!selectedRaceId || raceStatus==="running" || raceStatus==="idle"}>Reset / Save</button>
       </div>
-      <div>
+      <div className="timers">
         {[...Array(8)].map((_, i) => {
           const student = laneStudents[i];
           return (
             <div key={i}>
-              <h4>
-                Lane {i + 1}{' '}
-                {student ? `- ${student.first_name} ${student.last_name} (${student.house})` : ''}
-              </h4>
-
               {student && (
                 <label>
                   <input
@@ -138,8 +174,23 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
                 isAdmin={true}
                 selectedRaceId={selectedRaceId}
                 studentId={student?.student_id || null}
+                studentName={student?.first_name || null}
+                studentHouse={student?.house || null}
                 onStop={(lane, time) => {
-                  setTimers((prev) => ({ ...prev, [lane]: { studentId: student?.student_id, time } }));
+                  setTimers((prev) => ({
+                    ...prev,
+                    [lane]: { studentId: student?.student_id, time },
+                  }));
+
+                  // decrement active timers
+                  setActiveTimers((prev) => {
+                    const newCount = prev - 1;
+                    if (newCount <= 0) {
+                      setRaceStatus("finished"); // all timers done
+                      return 0;
+                    }
+                    return newCount;
+                  });
                 }}
               />
             </div>

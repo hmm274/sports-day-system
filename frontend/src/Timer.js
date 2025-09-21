@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const Timer = ({ laneId, socket, isAdmin, onStop }) => {
+const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) => {
   const [elapsed, setElapsed] = useState(0); // milliseconds
   const [running, setRunning] = useState(false);
   const [startTime, setStartTime] = useState(null);
@@ -84,17 +84,15 @@ const Timer = ({ laneId, socket, isAdmin, onStop }) => {
   };
 
   return (
-    <div style={{ marginBottom: '10px', padding: '5px', border: '1px solid #ccc', borderRadius: '4px' }}>
-      <h4>Lane {laneId}</h4>
-      <p>Time: {formatTime(elapsed)}</p>
-
-      {running && isAdmin && (
-        <button onClick={handleAdminStop}>Stop</button>
-      )}
-
-      {running && !isAdmin && (
-        <button onClick={handleStop}>Stop</button>
-      )}
+    <div className={isAdmin ? "admin-Timer" : "Timer"}>
+      {isAdmin ?
+        <h2>Lane {laneId} - {studentName ? studentName : "Unselected"}</h2>
+        :
+        <h1>Lane {laneId} - {studentName ? studentName : "Unselected"}</h1>
+      }
+      <p>{studentHouse ? studentHouse : ""}</p>
+      <p className="time">{formatTime(elapsed)}</p>
+      <button className={running ? "stop-button-enable" : "stop-button-disable"} disabled={!running} onClick={isAdmin ? handleAdminStop : handleStop}>Stop</button>
     </div>
   );
 };

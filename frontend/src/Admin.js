@@ -4,8 +4,8 @@ import { supabase } from "./supabaseClient";
 export default function Admin() {
   const [event, setEvent] = useState("");
   const [grade, setGrade] = useState("");
-  const [gender, setGender] = useState("");
-  const [students, setStudents] = useState([]);
+  const [maleStudents, setMaleStudents] = useState([]);
+  const [femaleStudents, setFemaleStudents] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -47,34 +47,37 @@ export default function Admin() {
         }
 
         // 3. Query students, excluding those already in race
-        let query = supabase
+        let queryMale = supabase
             .from("students")
             .select("*")
-            .eq("grade", grade);
+            .eq("grade", grade)
+            .eq("sex", "Male");
 
-        if (["100m", "400m"].includes(event)) {
-            if (!gender) {
-            setStudents([]);
-            return;
-            }
-            query = query.eq("sex", gender);
-        }
+        let queryFemale = supabase
+            .from("students")
+            .select("*")
+            .eq("grade",grade)
+            .eq("sex", "Female")
 
         if (alreadyInRaceIds.length > 0) {
-            query = query.not("student_id", "in", `(${alreadyInRaceIds.join(",")})`);
+            queryMale = queryMale.not("student_id", "in", `(${alreadyInRaceIds.join(",")})`);
+            queryFemale = queryFemale.not("student_id", "in", `(${alreadyInRaceIds.join(",")})`);
         }
 
-        const { data, error } = await query;
+        const { data:dataMale, error:errorMale } = await queryMale;
+        const { data:dataFemale, error:errorFemale } = await queryFemale;
 
-        if (error) {
-            console.error(error);
+        if (errorMale || errorFemale) {
+            console.error(errorMale);
+            console.error(errorFemale);
         } else {
-            setStudents(data || []);
+            setMaleStudents(dataMale || []);
+            setFemaleStudents(dataFemale || []);
         }
         };
 
     fetchStudents();
-    }, [event, grade, gender]);
+    }, [event, grade]);
 
   const toggleSelect = (id) => {
     if (selected.includes(id)) {
@@ -87,7 +90,7 @@ export default function Admin() {
   };
 
   const saveRace = async () => {
-    if (!event || !grade || (["100m", "400m"].includes(event) && !gender)) {
+    if (!event || !grade) {
         alert("Please complete all filters.");
         return;
     }
@@ -131,10 +134,10 @@ export default function Admin() {
         alert("Race and results saved!");
         // Reset state
         setSelected([]);
-        setStudents([]);
+        setMaleStudents([]);
+        setFemaleStudents([]);
         setEvent("");
         setGrade("");
-        setGender("");
     } catch (err) {
         console.error(err);
         alert("Error saving race or results.");
@@ -144,80 +147,99 @@ export default function Admin() {
     };
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div>
       <h2>Setup New Race</h2>
-      <div style={{ marginBottom: "10px" }}>
-        <label>Event:</label>
-        <select
-          value={event}
-          onChange={(e) => {
-            setEvent(e.target.value);
-            setGender(""); // reset gender when event changes
-          }}
-        >
-          <option value="">Select event</option>
-          {events.map((ev) => (
-            <option key={ev} value={ev}>
-              {ev}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div style={{ marginBottom: "10px" }}>
-        <label>Grade:</label>
-        <select value={grade} onChange={(e) => setGrade(e.target.value)}>
-          <option value="">Select grade</option>
-          {gradeOptions.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {["100m", "400m"].includes(event) && (
-        <div style={{ marginBottom: "10px" }}>
-          <label>Gender:</label>
-          <select value={gender} onChange={(e) => setGender(e.target.value)}>
-            <option value="">Select gender</option>
-            <option value="Male">Boys</option>
-            <option value="Female">Girls</option>
+      <div className="options">
+        <div>
+          <select
+            value={event}
+            onChange={(e) => {
+              setEvent(e.target.value);
+            }}
+          >
+            <option value="">Select event</option>
+            {events.map((ev) => (
+              <option key={ev} value={ev}>
+                {ev}
+              </option>
+            ))}
           </select>
         </div>
-      )}
 
-      <div style={{ marginBottom: "10px" }}>
-        <h3>Available Students</h3>
-        {students.length === 0 && <p>No students available.</p>}
-        <div style={{ maxHeight: "200px", overflowY: "auto" }}>
-          {students.map((s) => (
-            <label
-              key={s.student_id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "5px",
-                border: "1px solid #ccc",
-                marginBottom: "2px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(s.student_id)}
-                onChange={() => toggleSelect(s.student_id)}
-                disabled={!selected.includes(s.student_id) && selected.length >= 8}
-              />
-              {s.first_name} {s.last_name} ({s.grade}, {s.sex})
-            </label>
-          ))}
+        <div>
+          <select value={grade} onChange={(e) => setGrade(e.target.value)}>
+            <option value="">Select grade</option>
+            {gradeOptions.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-
-      <button onClick={saveRace} disabled={loading}>
-        {loading ? "Saving..." : "Save Race"}
+      <div>
+        <h3>Available Students</h3>
+        <div className="genders">
+          <div>
+            <h4>Male</h4>
+            {maleStudents.length === 0 && <p>No students available.</p>}
+            <div style={{ maxHeight: "52vh", overflowY: "auto" }}>
+              {maleStudents.map((s) => (
+                <label
+                  key={s.student_id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    padding: "5px",
+                    border: "1px solid #ccc",
+                    marginBottom: "2px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(s.student_id)}
+                    onChange={() => toggleSelect(s.student_id)}
+                    disabled={!selected.includes(s.student_id) && selected.length >= 8}
+                  />
+                  {s.first_name} {s.last_name} ({s.house})
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4>Female</h4>
+            {femaleStudents.length === 0 && <p>No students available.</p>}
+            <div style={{ maxHeight: "52vh", overflowY: "auto" }}>
+              {femaleStudents.map((s) => (
+                <label
+                  key={s.student_id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    padding: "5px",
+                    border: "1px solid #ccc",
+                    marginBottom: "2px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(s.student_id)}
+                    onChange={() => toggleSelect(s.student_id)}
+                    disabled={!selected.includes(s.student_id) && selected.length >= 8}
+                  />
+                  {s.first_name} {s.last_name} ({s.house})
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <button onClick={saveRace} disabled={loading} className="save-race">
+        {loading ? "Saving..." : "Save Race ("+selected.length+")"}
       </button>
     </div>
   );

@@ -85,6 +85,14 @@ io.on('connection', (socket) => {
     console.log('Admin reset all timers');
   });
 
+  socket.on('assign-students', (lanes)=>{
+    io.emit('assign-students',lanes);
+  });
+
+  socket.on('clear-students', ()=>{
+    io.emit('clear-students');
+  })
+
   socket.on('disconnect', () => {
     const role = roleAssignments[socket.id];
     if (role) {

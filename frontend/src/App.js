@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Timer from './Timer';
 import io from 'socket.io-client';
 import Admin from './Admin';
@@ -31,6 +31,7 @@ function App() {
   const [adminAction, setAdminAction] = useState('none');
   const [field, setField] = useState(false);
   const [points, setPoints] = useState(false);
+  const [studentInfo, setStudentInfo] = useState({ name: null, house: null });
 
   const handleLogin = () => {
     if (ROLE_PASSCODES[role] !== passcode) {
@@ -121,6 +122,26 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    socket.on("assign-students", (laneStudents) => {
+      const laneNum = parseInt(role.split('-')[1]);
+      const assigned = laneStudents[laneNum - 1];
+      if (assigned) {
+        setStudentInfo({ name: assigned.first_name, house: assigned.house });
+      }
+    });
+
+    socket.on("clear-students",()=>{
+      setStudentInfo({ name: null, house: null });
+    })
+
+    return () => {
+      socket.off("assign-students");
+      socket.off("clear-students");
+    };
+  }, [role]);
+
+
 
   const handleLogout = () => {
     socket.disconnect();
@@ -173,7 +194,7 @@ function App() {
     return(
       <div>
         <FieldManager />
-        <button onClick={handleLogout}>Log out</button>
+        <button className="button-logout" onClick={handleLogout}>Log out</button>
       </div>
     );
   }
@@ -207,6 +228,8 @@ function App() {
           laneId={parseInt(role.split('-')[1])}
           socket={socket}
           isAdmin={false}
+          studentName={studentInfo.name}
+          studentHouse={studentInfo.house}
         />
       )}
       <div className="button-logout">

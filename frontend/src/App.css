@@ -27,6 +27,7 @@ input, select, button{
   border-radius:10px;
   border-width: 1px;
   margin-bottom: 10px;
+  margin-right:5px;
   padding: 5px;
   background-color:white;
 }
@@ -52,14 +53,18 @@ input:hover, select:hover, button:hover{
 .stop-button-enable{
   background-color:white;
 }
+.stop-button-enable:hover, .stop-button-enable:active{
+  transition:0s;
+}
 .stop-button-disable, .stop-button-disable:hover{
   background-color:white;
   filter:none;
+  transition:0s;
 }
 .menu{
   position: fixed;
   top: 0.5em;
-  right: 6em;
+  right: 6.5em;
 }
 .menu button{
   margin:2px;
@@ -109,4 +114,17 @@ td, th{
   margin-bottom:15px;
   gap: 5px;
   display:flex;
+}
+.entries{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 10px;
+  justify-content:space-evenly;
+}
+.entries div{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  border:solid 1px black;
+  flex: 1 0 auto;
 }

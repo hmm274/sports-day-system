@@ -48,6 +48,9 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
 
     // set race back to idle state
     setRaceStatus("idle");
+    setSelectedRaceId(null);
+
+    socket.emit("clear-students");
   };
 
   const fetchRaces = async () => {
@@ -118,6 +121,7 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
         lanes[entry.lane - 1] = entry.student;
       });
       setLaneStudents(lanes);
+      socket.emit("assign-students", lanes); 
     }
   };
 

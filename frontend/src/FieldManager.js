@@ -197,42 +197,44 @@ export default function FieldManager() {
       {students.length > 0 && (
         <div>
           <h3>Enter Distances</h3>
-          {students.map((student) => (
-            <div key={student.student_id}>
-              <span>{student.first_name} {student.last_name}</span>
-              <input
-                type="number"
-                step="0.01"
-                value={distances[fieldId]?.[student.student_id] || ""}
-                readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.studentId]}
-                onChange={(e) =>
-                  setDistances({
-                    ...distances,
-                    [fieldId]: { ...distances[fieldId], [student.student_id]: e.target.value }
-                  })
-                }
-              />
-              <label>
+          <div className="entries">
+            {students.map((student) => (
+              <div key={student.student_id}>
+                <span>{student.first_name} {student.last_name}</span>
                 <input
-                  type="checkbox"
-                  checked={noResult[fieldId]?.[student.student_id] || false}
-                  disabled={lockedInputs[fieldId]?.[student.student_id]}
+                  type="number"
+                  step="0.01"
+                  value={distances[fieldId]?.[student.student_id] || ""}
+                  readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.studentId]}
                   onChange={(e) =>
-                    setNoResult(prev => ({
-                      ...prev,
-                      [fieldId]: { ...prev[fieldId], [student.student_id]: e.target.checked }
-                    }))
+                    setDistances({
+                      ...distances,
+                      [fieldId]: { ...distances[fieldId], [student.student_id]: e.target.value }
+                    })
                   }
-                />{" "}
-                NR
-              </label>
-              {!lockedInputs[fieldId]?.[student.student_id] && (
-                <button onClick={() => handleSetDistance(student.student_id)}>
-                  Set
-                </button>
-              )}
-            </div>
-          ))}
+                />
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={noResult[fieldId]?.[student.student_id] || false}
+                    disabled={lockedInputs[fieldId]?.[student.student_id]}
+                    onChange={(e) =>
+                      setNoResult(prev => ({
+                        ...prev,
+                        [fieldId]: { ...prev[fieldId], [student.student_id]: e.target.checked }
+                      }))
+                    }
+                  />{" "}
+                  No Result
+                </label>
+                {!lockedInputs[fieldId]?.[student.student_id] && (
+                  <button onClick={() => handleSetDistance(student.student_id)}>
+                    Set
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -9,7 +9,7 @@ import HousePoints from './HousePoints';
 import FieldManager from './FieldManager';
 import './App.css';
 
-const socket = io('http://localhost:3001');
+const socket = io(process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001');
 
 const ROLE_PASSCODES = {
   admin: 'admin123',

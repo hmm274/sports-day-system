@@ -1,40 +1,34 @@
 import { useState, useEffect } from 'react';
 
 const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) => {
-  const [elapsed, setElapsed] = useState(0); // milliseconds
+  const [elapsed, setElapsed] = useState(0); // display time
   const [running, setRunning] = useState(false);
-  const [startTime, setStartTime] = useState(null);
+  const [startTime, setStartTime] = useState(null); // client-side start timestamp
 
   // Listen for server events
   useEffect(() => {
-    // Start all timers
-    const handleStart = ({ startTimestamp }) => {
-      setStartTime(startTimestamp);
+    const handleStart = () => {
+      const now = Date.now();
+      setStartTime(now);
+      setElapsed(0);
       setRunning(true);
     };
 
-    // Stop a specific lane
-    const handleStopLane = ({ laneId: stoppedLaneId, elapsed }) => {
+    const handleStopLane = ({ laneId: stoppedLaneId, elapsed: serverElapsed }) => {
       if (stoppedLaneId === laneId) {
-        setElapsed(elapsed);
+        setElapsed(serverElapsed); // show server time
         setRunning(false);
-        if (onStop){
-          onStop(laneId,(elapsed/1000))
-        };
+        onStop?.(laneId, serverElapsed / 1000);
       }
     };
 
-    // Stop all timers
     const handleStopAll = ({ elapsed: allElapsed }) => {
-      const laneTime=(allElapsed[laneId-1]||0);
-      setElapsed(laneTime);
+      const serverTime = allElapsed[laneId - 1] || 0;
+      setElapsed(serverTime); // show server time
       setRunning(false);
-      if(onStop){
-        onStop(laneId,(laneTime/1000))
-      };
+      onStop?.(laneId, serverTime / 1000);
     };
 
-    // Reset all timers
     const handleReset = () => {
       setElapsed(0);
       setStartTime(null);
@@ -54,14 +48,14 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
     };
   }, [socket, laneId, onStop]);
 
-  // Update elapsed time continuously using wall-clock
+  // Update display while running
   useEffect(() => {
-    let interval;
-    if (running && startTime !== null) {
-      interval = setInterval(() => {
-        setElapsed(Math.max(0, Date.now() - startTime));
-      }, 50); // 50ms is enough for smooth display
-    }
+    if (!running || startTime === null) return;
+    const interval = setInterval(() => {
+      const diff = Date.now() - startTime;
+      setElapsed(diff > 0 ? diff : 0); // client-side elapsed
+    }, 50);
+
     return () => clearInterval(interval);
   }, [running, startTime]);
 
@@ -71,13 +65,11 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
     return `${seconds}.${milliseconds.toString().padStart(3, '0')}s`;
   };
 
-  // Lane stops their own timer
   const handleStop = () => {
     if (!isAdmin) socket.emit('stop-timer', laneId);
     setRunning(false);
   };
 
-  // Admin stops this lane
   const handleAdminStop = () => {
     if (isAdmin) socket.emit('admin-stop-lane', laneId);
     setRunning(false);
@@ -85,14 +77,20 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
 
   return (
     <div className={isAdmin ? "admin-Timer" : "Timer"}>
-      {isAdmin ?
-        <h2>Lane {laneId} - {studentName ? studentName : "Unselected"}</h2>
-        :
-        <h1>Lane {laneId} - {studentName ? studentName : "Unselected"}</h1>
-      }
-      <p>{studentHouse ? studentHouse : ""}</p>
+      {isAdmin ? (
+        <h2>Lane {laneId} - {studentName || "Unselected"}</h2>
+      ) : (
+        <h1>Lane {laneId} - {studentName || "Unselected"}</h1>
+      )}
+      <p>{studentHouse || ""}</p>
       <p className="time">{formatTime(elapsed)}</p>
-      <button className={running ? "stop-button-enable" : "stop-button-disable"} disabled={!running} onClick={isAdmin ? handleAdminStop : handleStop}>Stop</button>
+      <button
+        className={running ? "stop-button-enable" : "stop-button-disable"}
+        disabled={!running}
+        onClick={isAdmin ? handleAdminStop : handleStop}
+      >
+        Stop
+      </button>
     </div>
   );
 };

@@ -59,7 +59,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
     let interval;
     if (running && startTime !== null) {
       interval = setInterval(() => {
-        setElapsed(Date.now() - startTime);
+        setElapsed(Math.max(0, Date.now() - startTime));
       }, 50); // 50ms is enough for smooth display
     }
     return () => clearInterval(interval);

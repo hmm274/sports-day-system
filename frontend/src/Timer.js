@@ -4,6 +4,8 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
   const [elapsed, setElapsed] = useState(0); // display time
   const [running, setRunning] = useState(false);
   const [startTime, setStartTime] = useState(null); // client-side start timestamp
+  const [stopTime, setStopTime] = useState(null);   // when the user pressed stop
+  const [needResend, setNeedResend] = useState(false);
 
   // Listen for server events
   useEffect(() => {
@@ -12,12 +14,15 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       setStartTime(now);
       setElapsed(0);
       setRunning(true);
+      setStopTime(null);
+      setNeedResend(false);
     };
 
     const handleStopLane = ({ laneId: stoppedLaneId, elapsed: serverElapsed }) => {
       if (stoppedLaneId === laneId) {
         setElapsed(serverElapsed); // show server time
         setRunning(false);
+        setNeedResend(false); // server confirmed
         onStop?.(laneId, serverElapsed / 1000);
       }
     };
@@ -26,6 +31,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       const serverTime = allElapsed[laneId - 1] || 0;
       setElapsed(serverTime); // show server time
       setRunning(false);
+      setNeedResend(false);
       onStop?.(laneId, serverTime / 1000);
     };
 
@@ -33,6 +39,8 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       setElapsed(0);
       setStartTime(null);
       setRunning(false);
+      setStopTime(null);
+      setNeedResend(false);
     };
 
     socket.on('start-timer', handleStart);
@@ -66,8 +74,29 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
   };
 
   const handleStop = () => {
-    if (!isAdmin) socket.emit('stop-timer', laneId);
-    setRunning(false);
+    if (!isAdmin) {
+      const stopAt = Date.now();
+      setStopTime(stopAt);
+      setRunning(false);
+
+      // Emit with ack and timeout
+      socket.timeout(2000).emit('stop-timer', { laneId, stopTime: stopAt }, (err, res) => {
+        if (err) {
+          // server didn't ack
+          setNeedResend(true);
+        } else {
+          setNeedResend(false);
+        }
+      });
+    }
+  };
+
+  const retryStop = () => {
+    if (!isAdmin && stopTime) {
+      socket.timeout(2000).emit('restop-timer', { laneId, stopTime }, (err) => {
+        if (!err) setNeedResend(false);
+      });
+    }
   };
 
   const handleAdminStop = () => {
@@ -84,6 +113,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       )}
       <p>{studentHouse || ""}</p>
       <p className="time">{formatTime(elapsed)}</p>
+
       <button
         className={running ? "stop-button-enable" : "stop-button-disable"}
         disabled={!running}
@@ -91,6 +121,13 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       >
         Stop
       </button>
+
+      {/* Show retry only if needed */}
+      {!running && needResend && (
+        <button className="resend-button" onClick={retryStop}>
+          Resend Stop
+        </button>
+      )}
     </div>
   );
 };

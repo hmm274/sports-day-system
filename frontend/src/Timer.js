@@ -4,7 +4,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
   const [elapsed, setElapsed] = useState(0); // display time
   const [running, setRunning] = useState(false);
   const [startTime, setStartTime] = useState(null); // client-side start timestamp
-  const [ack, setAck] = useState(true);
+  const [ack, setAck] = useState(false);
 
   // Listen for server events
   useEffect(() => {
@@ -13,7 +13,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       setStartTime(now);
       setElapsed(0);
       setRunning(true);
-      setAck(true);
+      setAck(false);
     };
 
     const handleStopLane = ({ laneId: stoppedLaneId, elapsed: serverElapsed }) => {
@@ -71,7 +71,9 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
 
   const handleStop = () => {
     if (!isAdmin) socket.emit('stop-timer', laneId, (ack) => {
-      if (!ack.success){
+      if (ack.success){
+        setAck(true);
+      }else{
         setAck(false);
       }
     });
@@ -82,6 +84,8 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
     if(!isAdmin) socket.emit('restop-timer', laneId, elapsed, (ack)=>{
       if(ack.success){
         setAck(true);
+      }else{
+        setAck(false);
       }
     });
   }

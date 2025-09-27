@@ -4,6 +4,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
   const [elapsed, setElapsed] = useState(0); // display time
   const [running, setRunning] = useState(false);
   const [startTime, setStartTime] = useState(null); // client-side start timestamp
+  const [ack, setAck] = useState(true);
 
   // Listen for server events
   useEffect(() => {
@@ -12,6 +13,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       setStartTime(now);
       setElapsed(0);
       setRunning(true);
+      setAck(true);
     };
 
     const handleStopLane = ({ laneId: stoppedLaneId, elapsed: serverElapsed }) => {
@@ -37,12 +39,14 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
 
     socket.on('start-timer', handleStart);
     socket.on('stop-timer', handleStopLane);
+    socket.on('restop-timer', handleStopLane);
     socket.on('stop-all-timers', handleStopAll);
     socket.on('reset-all-timers', handleReset);
 
     return () => {
       socket.off('start-timer', handleStart);
       socket.off('stop-timer', handleStopLane);
+      socket.off('restop-timer', handleStopLane);
       socket.off('stop-all-timers', handleStopAll);
       socket.off('reset-all-timers', handleReset);
     };
@@ -66,9 +70,21 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
   };
 
   const handleStop = () => {
-    if (!isAdmin) socket.emit('stop-timer', laneId);
+    if (!isAdmin) socket.emit('stop-timer', laneId, (ack) => {
+      if (!ack.success){
+        setAck(false);
+      }
+    });
     setRunning(false);
   };
+
+  const handleRestop = () => {
+    if(!isAdmin) socket.emit('restop-timer', laneId, elapsed, (ack)=>{
+      if(ack.success){
+        setAck(true);
+      }
+    });
+  }
 
   const handleAdminStop = () => {
     if (isAdmin) socket.emit('admin-stop-lane', laneId);
@@ -91,6 +107,14 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       >
         Stop
       </button>
+      {(!isAdmin && !ack) &&
+        <button
+          disabled={!running}
+          onClick={handleRestop}
+        >
+          Resend
+        </button>
+      }
     </div>
   );
 };

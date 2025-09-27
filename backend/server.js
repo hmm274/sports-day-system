@@ -46,15 +46,26 @@ io.on('connection', (socket) => {
   });
 
   // Lane stops their own timer
-  socket.on('stop-timer', (laneId) => {
+  socket.on('stop-timer', (laneId, callback) => {
     const expectedRole = `lane-${laneId}`;
     if (roleAssignments[socket.id] === expectedRole) {
       const elapsed = Date.now() - startTimestamp;
       laneElapsed[laneId - 1] = elapsed;
       io.emit('stop-timer', { laneId, elapsed });
+      if(callback) callback({success:true});
       console.log(`Lane ${laneId} stopped. Elapsed: ${elapsed}`);
     }
   });
+
+  socket.on('restop-timer', (laneId, time, callback) =>{
+    const expectedRole = `lane-${laneId}`;
+    if(roleAssignments[socket.id]===expectedRole){
+      laneElapsed[laneId - 1] = time;
+      io.emit('restop-timer', { laneId, elapsed: time });
+      if(callback) callback({success:true});
+      console.log(`Lane ${laneId} time resent. Elapsed: ${time}`);
+    }
+  })
 
   // Admin stops any lane
   socket.on('admin-stop-lane', (laneId) => {

@@ -111,9 +111,9 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse }) =
       >
         Stop
       </button>
-      {(!isAdmin && !ack) &&
+      {(!isAdmin && !ack && !running) &&
         <button
-          disabled={!running}
+          disabled={running}
           onClick={handleRestop}
         >
           Resend

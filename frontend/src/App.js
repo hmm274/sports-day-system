@@ -13,7 +13,6 @@ const socket = io(process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001');
 
 const ROLE_PASSCODES = {
   admin: 'admin123',
-  field: 'field123',
   'lane-1': 'lane1pass',
   'lane-2': 'lane2pass',
   'lane-3': 'lane3pass',
@@ -171,7 +170,6 @@ function App() {
             <select value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="">Select Role</option>
               <option value="admin">Admin</option>
-              <option value="field">Field</option>
               {[...Array(8)].map((_, i) => (
                 <option key={i} value={`lane-${i + 1}`}>Lane {i + 1}</option>
               ))}
@@ -208,6 +206,7 @@ function App() {
             <div className="menu">
               <button onClick={()=>setAdminAction('set')}>Set Races</button>
               <button onClick={()=>setAdminAction('manage')}>Timer</button>
+              <button onClick={()=>setField(true)}>Field</button>
             </div>
             <Races />
           </div> :

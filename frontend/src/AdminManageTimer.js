@@ -20,18 +20,6 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
 
   const onStopAll = () => {
     handleStop(); // stops all timers in TimerGroup
-
-    // mark all currently running lanes as finished with their time = null
-    setTimers((prev) => {
-      const updated = { ...prev };
-      laneStudents.forEach((student, lane) => {
-        if (student && !updated[lane]) {
-          updated[lane] = { studentId: student.student_id, time: null };
-        }
-      });
-      return updated;
-    });
-
     setActiveTimers(0);        // no timers left running
     setRaceStatus("finished"); // mark race as complete
   };
@@ -154,17 +142,20 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
       <div className="timers">
         {[...Array(8)].map((_, i) => {
           const student = laneStudents[i];
+          const laneId = i + 1;
+          const laneTimer = timers[laneId]; // get stored result for lane
+
           return (
-            <div key={i}>
+            <div key={i} style={{ marginBottom: "20px" }}>
               {student && (
                 <label>
                   <input
                     type="checkbox"
-                    checked={!!noResult[i + 1]}
+                    checked={!!noResult[laneId]}
                     onChange={(e) =>
                       setNoResult((prev) => ({
                         ...prev,
-                        [i + 1]: e.target.checked,
+                        [laneId]: e.target.checked,
                       }))
                     }
                   />
@@ -173,10 +164,10 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
               )}
 
               <Timer
-                laneId={i + 1}
+                laneId={laneId}
                 socket={socket}
                 isAdmin={true}
-                selectedRaceId={selectedRaceId}
+                selectedRaceId={(selectedRaceId==null) ? null : selectedRaceId}
                 studentId={student?.student_id || null}
                 studentName={student?.first_name || null}
                 studentHouse={student?.house || null}
@@ -190,13 +181,20 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
                   setActiveTimers((prev) => {
                     const newCount = prev - 1;
                     if (newCount <= 0) {
-                      setRaceStatus("finished"); // all timers done
+                      setRaceStatus("finished");
                       return 0;
                     }
                     return newCount;
                   });
                 }}
               />
+
+              {/* ✅ Show saved/edited time if available */}
+              {(laneTimer && !(selectedRaceId == null)) && (
+                <p style={{ fontWeight: "bold", marginTop: "5px" }}>
+                  Saved Time: {laneTimer.time.toFixed(3)}s
+                </p>
+              )}
             </div>
           );
         })}

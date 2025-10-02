@@ -10,8 +10,8 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
 
   const events = ["50m", "100m", "200m", "400m"];
-  const gradeOptions = (event === "50m" || event === "200m") ? ["G1", "G2", "G3", "G4", "G5"] : ["G6", "G7", "G8", "G9", "G10", "G11", "G12"];
-
+  //const gradeOptions = (event === "50m" || event === "200m") ? ["G1", "G2", "G3", "G4", "G5"] : ["G6", "G7", "G8", "G9", "G10", "G11", "G12"];
+  const gradeOptions = ["G7"];
   // Fetch students whenever filters change
   useEffect(() => {
     const fetchStudents = async () => {

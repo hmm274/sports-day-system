@@ -75,10 +75,6 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse, sel
     setRunning(false);
   };
 
-  const handleRestop = () => {
-    if (!isAdmin) socket.emit('restop-timer', laneId, elapsed);
-  };
-
   const handleAdminStop = () => {
     if (isAdmin) socket.emit('admin-stop-lane', laneId);
     setRunning(false);

@@ -28,7 +28,6 @@ function App() {
   const [passcode, setPasscode] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [adminAction, setAdminAction] = useState('none');
-  const [field, setField] = useState(false);
   const [points, setPoints] = useState(false);
   const [studentInfo, setStudentInfo] = useState({ name: null, house: null });
 
@@ -38,22 +37,17 @@ function App() {
       return;
     }
 
-    if (role!=="field"){
-      if(socket.disconnected){
-        socket.connect();
-      }
-
-      socket.emit('request-role', role, (response) => {
-        if (response.success) {
-          setAuthenticated(true);
-        } else {
-          alert(response.message);
-        }
-      });
-    }else{
-      setAuthenticated(true);
-      setField(true);
+    if(socket.disconnected){
+      socket.connect();
     }
+
+    socket.emit('request-role', role, (response) => {
+      if (response.success) {
+        setAuthenticated(true);
+      } else {
+        alert(response.message);
+      }
+    });
   };
 
   const handleStart = () => {
@@ -146,7 +140,6 @@ function App() {
     socket.disconnect();
     setAuthenticated(false);
     setAdminAction('none');
-    setField(false);
   }
 
   const handleUndo = () => {
@@ -188,15 +181,6 @@ function App() {
     }
   }
 
-  if(field){
-    return(
-      <div>
-        <FieldManager />
-        <button className="button-logout" onClick={handleLogout}>Log out</button>
-      </div>
-    );
-  }
-
   return (
     <div className="App">
       {role === 'admin' ? (
@@ -206,7 +190,7 @@ function App() {
             <div className="menu">
               <button onClick={()=>setAdminAction('set')}>Set Races</button>
               <button onClick={()=>setAdminAction('manage')}>Timer</button>
-              <button onClick={()=>setField(true)}>Field</button>
+              <button onClick={()=>setAdminAction('field')}>Field</button>
             </div>
             <Races />
           </div> :
@@ -216,7 +200,14 @@ function App() {
                 <Admin />
               </div> :
               <div>
-                <AdminManageTimer handleStart={handleStart} handleStop={handleStop} handleSave={handleSave} socket={socket} />
+                {adminAction==='field' ?
+                  <div>
+                    <FieldManager />
+                  </div> :
+                  <div>
+                    <AdminManageTimer handleStart={handleStart} handleStop={handleStop} handleSave={handleSave} socket={socket} />
+                  </div>
+                }
               </div>
             }
           </div>
@@ -232,7 +223,7 @@ function App() {
         />
       )}
       <div className="button-logout">
-        {(adminAction!=="none" && !field) && <button className="button-logout-1" onClick={handleUndo}>Back</button>}
+        {(adminAction!=="none") && <button className="button-logout-1" onClick={handleUndo}>Back</button>}
         <button onClick={handleLogout}>Log out</button>
       </div>
     </div>

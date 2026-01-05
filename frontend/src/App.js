@@ -58,7 +58,6 @@ function App() {
   }
   const handleSave = async (selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult) => {
     try {
-      // Convert timers to results array
       let results = Object.entries(timers).map(([lane, data]) => ({
         race_id: selectedRaceId,
         student_id: data.studentId,
@@ -67,20 +66,18 @@ function App() {
         no_result: !!noResult[lane]
       }));
 
-      // Sort results by time (ascending = fastest first)
       results.sort((a, b) => {
         if (a.no_result && !b.no_result) return 1;
         if (!a.no_result && b.no_result) return -1;
         return a.time - b.time
       });
 
-      // Assign points based on placement
       results = results.map((res, index) => {
         if (res.no_result){
           return {...res, points: 0}
         }
 
-        let points = 5; // default for 5th place and under
+        let points = 5;
         if (index === 0) points = 40;
         else if (index === 1) points = 30;
         else if (index === 2) points = 20;
@@ -91,7 +88,6 @@ function App() {
 
       console.log("Saving results:", results);
 
-      // Upsert into race_results with points
       const { data, error } = await supabase
         .from('race_results')
         .upsert(results, { onConflict: ['race_id', 'student_id'] });

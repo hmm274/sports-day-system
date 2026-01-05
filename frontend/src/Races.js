@@ -8,8 +8,6 @@ export default function Races() {
   useEffect(() => {
     const fetchRaces = async () => {
       setLoading(true);
-
-      // Fetch races and join race_results → students
       const { data, error } = await supabase
         .from("races")
         .select(`

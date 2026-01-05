@@ -6,8 +6,6 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse, sel
   const [startTime, setStartTime] = useState(null);
   const [editing, setEditing] = useState(false);
   const [editedTime, setEditedTime] = useState("");
-
-  // Listen for server events
   useEffect(() => {
     const handleStart = () => {
       const now = Date.now();
@@ -52,8 +50,6 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse, sel
       socket.off('reset-all-timers', handleReset);
     };
   }, [socket, laneId, onStop]);
-
-  // Update display while running
   useEffect(() => {
     if (!running || startTime === null) return;
     const interval = setInterval(() => {
@@ -81,10 +77,10 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse, sel
   };
 
   const handleSaveEdit = () => {
-    const ms = parseFloat(editedTime) * 1000; // seconds → ms
+    const ms = parseFloat(editedTime) * 1000;
     if (!isNaN(ms)) {
       setElapsed(ms);
-      onStop?.(laneId, ms / 1000); // update parent
+      onStop?.(laneId, ms / 1000);
       setEditing(false);
     }
   };
@@ -125,7 +121,7 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse, sel
       {(isAdmin && !running && !editing && !(selectedRaceId==null)) && (
         <button onClick={() => {
           setEditing(true);
-          setEditedTime((elapsed / 1000).toFixed(3)); // preload current time
+          setEditedTime((elapsed / 1000).toFixed(3));
         }}>
           Edit Time
         </button>

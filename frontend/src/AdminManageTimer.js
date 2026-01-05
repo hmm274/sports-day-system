@@ -5,36 +5,29 @@ import Timer from './Timer';
 const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
   const [races, setRaces] = useState([]);
   const [selectedRaceId, setSelectedRaceId] = useState(null);
-  const [laneStudents, setLaneStudents] = useState([]); // array of student objects per lane
+  const [laneStudents, setLaneStudents] = useState([]);
   const [timers, setTimers] = useState({});
   const [noResult, setNoResult] = useState({});
   const [raceStatus, setRaceStatus] = useState("idle"); 
-  // "idle" | "running" | "finished"
   const [activeTimers, setActiveTimers] = useState(0);
 
   const onStartAll = () => {
     handleStart();
     setRaceStatus("running");
-    setActiveTimers(laneStudents.filter(Boolean).length); // number of students in race
+    setActiveTimers(laneStudents.filter(Boolean).length);
   };
 
   const onStopAll = () => {
-    handleStop(); // stops all timers in TimerGroup
-    setActiveTimers(0);        // no timers left running
-    setRaceStatus("finished"); // mark race as complete
+    handleStop();
+    setActiveTimers(0);
+    setRaceStatus("finished");
   };
 
   const onReset = async() => {
     handleStop();
     await handleSave(selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult); 
-
-    // clear all recorded times
     setTimers({});
-
-    // reset active timers count
     setActiveTimers(0);
-
-    // set race back to idle state
     setRaceStatus("idle");
     setSelectedRaceId(null);
 
@@ -51,8 +44,6 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
       console.error('Error fetching races:', raceError);
       return;
     }
-
-    // Fetch students for each race to display in dropdown
     const racesWithNames = await Promise.all(
       raceData.map(async (race) => {
         const { data: resultsData } = await supabase
@@ -72,13 +63,10 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
 
     setRaces(racesWithNames.filter(r => r.studentNames !== ''));
   };
-
-  // Fetch all races along with student names for dropdown display
   useEffect(() => {
     fetchRaces();
   }, []);
 
-  // Fetch lane students whenever a race is selected
   const fetchLaneStudents = async () => {
     if (!selectedRaceId) {
       setLaneStudents([]);
@@ -143,7 +131,7 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
         {[...Array(8)].map((_, i) => {
           const student = laneStudents[i];
           const laneId = i + 1;
-          const laneTimer = timers[laneId]; // get stored result for lane
+          const laneTimer = timers[laneId];
 
           return (
             <div key={i} style={{ marginBottom: "20px" }}>
@@ -177,7 +165,6 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
                     [lane]: { studentId: student?.student_id, time },
                   }));
 
-                  // decrement active timers
                   setActiveTimers((prev) => {
                     const newCount = prev - 1;
                     if (newCount <= 0) {
@@ -189,7 +176,6 @@ const AdminManageTimer = ({handleStart, handleStop, handleSave, socket}) => {
                 }}
               />
 
-              {/* ✅ Show saved/edited time if available */}
               {(laneTimer && !(selectedRaceId == null)) && (
                 <p style={{ fontWeight: "bold", marginTop: "5px" }}>
                   Saved Time: {laneTimer.time.toFixed(3)}s

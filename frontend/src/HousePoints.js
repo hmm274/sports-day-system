@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "./supabaseClient"; // adjust path if needed
+import { supabase } from "./supabaseClient";
 
 export default function HousePoints() {
   const [points, setPoints] = useState({
@@ -54,15 +54,13 @@ export default function HousePoints() {
 
   useEffect(() => {
     fetchPoints();
-
-    // Subscribe to realtime changes in race_results
     const raceChannel = supabase
       .channel("race_results-changes")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "race_results" },
         () => {
-          fetchPoints(); // refresh on insert/update/delete
+          fetchPoints();
         }
       )
       .subscribe();

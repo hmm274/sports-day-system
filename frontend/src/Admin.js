@@ -12,12 +12,10 @@ export default function Admin() {
   const events = ["50m", "100m", "200m", "400m"];
   const gradeOptions = (event === "50m" || event === "200m") ? ["G1", "G2", "G3", "G4", "G5"] : ["G6", "G7", "G8", "G9", "G10", "G11", "G12"];
 
-  // Fetch students whenever filters change
   useEffect(() => {
     const fetchStudents = async () => {
         if (!event || !grade) return;
 
-        // 1. Find all races of this event
         const { data: races, error: raceError } = await supabase
             .from("races")
             .select("race_id")
@@ -30,7 +28,6 @@ export default function Admin() {
 
         const raceIds = races.map(r => r.race_id);
 
-        // 2. Get all students already in those races
         let alreadyInRaceIds = [];
         if (raceIds.length > 0) {
             const { data: raceResults, error: resultsError } = await supabase
@@ -46,7 +43,6 @@ export default function Admin() {
             alreadyInRaceIds = raceResults.map(rr => rr.student_id);
         }
 
-        // 3. Query students, excluding those already in race
         let queryMale = supabase
             .from("students")
             .select("*")
@@ -103,7 +99,6 @@ export default function Admin() {
     setLoading(true);
 
     try {
-        // 1. Insert new race
         const { data: raceData, error: raceError } = await supabase
         .from("races")
         .insert([
@@ -111,18 +106,17 @@ export default function Admin() {
             race_event: event,
             },
         ])
-        .select(); // select() ensures we get the inserted row including race_id
+        .select();
 
         if (raceError) throw raceError;
 
         const race_id = raceData[0].race_id;
 
-        // 2. Insert each student into race_results
         const results = selected.map((student_id, idx) => ({
         race_id,
         student_id,
         lane: idx + 1,
-        time: null, // initial time is null
+        time: null,
         }));
 
         const { error: resultsError } = await supabase
@@ -132,7 +126,6 @@ export default function Admin() {
         if (resultsError) throw resultsError;
 
         alert("Race and results saved!");
-        // Reset state
         setSelected([]);
         setMaleStudents([]);
         setFemaleStudents([]);

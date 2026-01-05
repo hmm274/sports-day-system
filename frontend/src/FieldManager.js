@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "./supabaseClient"; // adjust import path
+import { supabase } from "./supabaseClient";
 
 export default function FieldManager() {
   const [eventType, setEventType] = useState("");
@@ -7,11 +7,10 @@ export default function FieldManager() {
   const [gender, setGender] = useState("");
   const [fieldId, setFieldId] = useState(null);
   const [students, setStudents] = useState([]);
-  const [distances, setDistances] = useState({}); // { [fieldId]: { [studentId]: value } }
-  const [lockedInputs, setLockedInputs] = useState({}); // { [fieldId]: { [studentId]: true } }
+  const [distances, setDistances] = useState({});
+  const [lockedInputs, setLockedInputs] = useState({});
   const [noResult, setNoResult] = useState({});
 
-  // Fetch field_id whenever event, grade, and gender are selected
   useEffect(() => {
     const fetchFieldId = async () => {
       if (eventType && grade && gender) {
@@ -34,12 +33,10 @@ export default function FieldManager() {
     fetchFieldId();
   }, [eventType, grade, gender]);
 
-  // Fetch students and existing results for the current field
   useEffect(() => {
     const fetchStudents = async () => {
       if (!fieldId) return;
 
-      // 1. Get all results for this field
       const { data: results, error: resultsError } = await supabase
         .from("field_results")
         .select("student_id, distance")
@@ -55,7 +52,6 @@ export default function FieldManager() {
         resultsMap[r.student_id] = r.distance;
       });
 
-      // 2. Get all students in grade/gender
       const { data: studentsData, error: studentsError } = await supabase
         .from("students")
         .select("student_id, first_name, last_name")
@@ -67,11 +63,11 @@ export default function FieldManager() {
         return;
       }
 
-      // 3. Initialize distances and lockedInputs for this field
       setDistances(prev => ({
         ...prev,
         [fieldId]: { ...resultsMap, ...prev[fieldId] }
       }));
+
       setLockedInputs(prev => ({
         ...prev,
         [fieldId]: Object.fromEntries(
@@ -79,7 +75,6 @@ export default function FieldManager() {
         )
       }));
 
-      // 4. Merge students with results
       const merged = studentsData.map(s => ({
         ...s,
         existingResult: resultsMap[s.student_id] ?? null,
@@ -101,7 +96,6 @@ export default function FieldManager() {
       if (isNaN(distance)) return alert("Enter a valid number");
     }
 
-    // 1. Insert or update the field result
     const { error: insertError } = await supabase
         .from("field_results")
         .upsert([{ field_id: fieldId, student_id: studentId, distance: no_result ? null : distance, points: no_result ? 0 : null, no_result: no_result ? no_result : false }], {
@@ -113,14 +107,11 @@ export default function FieldManager() {
         return;
     }
 
-    // 2. Lock the input
     setLockedInputs(prev => ({
     ...prev,
     [fieldId]: { ...prev[fieldId], [studentId]: true }
     }));
 
-
-    // 3. Fetch all results for this field
     const { data: results, error: resultsError } = await supabase
         .from("field_results")
         .select("student_id, distance")
@@ -131,10 +122,7 @@ export default function FieldManager() {
         return;
     }
     const validResults = results.filter(r => !(noResult[fieldId]?.[r.student_id]));
-    // 4. Sort descending by distance
     const sorted = validResults.sort((a, b) => b.distance - a.distance);
-
-    // 5. Assign points based on rank
     const pointsMap = {};
     sorted.forEach((r, index) => {
         if (index === 0) pointsMap[r.student_id] = 40;
@@ -144,7 +132,6 @@ export default function FieldManager() {
         else pointsMap[r.student_id] = 5;
     });
 
-    // 6. Update points in field_results table
     for (const sId in pointsMap) {
         const { error: updateError } = await supabase
         .from("field_results")
@@ -159,7 +146,6 @@ export default function FieldManager() {
 
   const handleEventType = (target) => {
     setEventType(target);
-    // Clear only the current field's typed distances, keep others
     setDistances(prev => ({ ...prev, [fieldId]: {} }));
   };
 

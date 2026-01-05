@@ -16,10 +16,10 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(bodyParser.json());
 
-let roleAssignments = {}; // socketId -> role
-let roleLocks = new Set(); // roles in use
-let startTimestamp = null; // timestamp for running timers
-let laneElapsed = Array(8).fill(0); // stores elapsed time per lane in ms
+let roleAssignments = {};
+let roleLocks = new Set();
+let startTimestamp = null;
+let laneElapsed = Array(8).fill(0);
 
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
@@ -35,7 +35,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Admin starts all timers
   socket.on('start-timer', () => {
     if (roleAssignments[socket.id] === 'admin') {
       startTimestamp = Date.now();
@@ -45,7 +44,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Lane stops their own timer
   socket.on('stop-timer', (laneId, callback) => {
     const expectedRole = `lane-${laneId}`;
     if (roleAssignments[socket.id] === expectedRole) {
@@ -56,7 +54,6 @@ io.on('connection', (socket) => {
       console.log(`Lane ${laneId} stopped. Elapsed: ${elapsed}`);
     }
   });
-  // Admin stops any lane
   socket.on('admin-stop-lane', (laneId) => {
     if (roleAssignments[socket.id] === 'admin') {
       const elapsed = Date.now() - startTimestamp;
@@ -66,7 +63,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Admin stops all lanes
   socket.on('stop-all-timers', () => {
     const now = Date.now();
     laneElapsed = laneElapsed.map((time, i) =>
@@ -77,7 +73,6 @@ io.on('connection', (socket) => {
     console.log('Admin stopped all timers', elapsedCopy);
   });
 
-  // Admin resets all timers
   socket.on('reset-all-timers', () => {
     startTimestamp = null;
     laneElapsed = Array(8).fill(0);

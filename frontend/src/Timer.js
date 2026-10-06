@@ -7,10 +7,9 @@ const Timer = ({ laneId, socket, isAdmin, onStop, studentName, studentHouse, sel
   const [editing, setEditing] = useState(false);
   const [editedTime, setEditedTime] = useState("");
   useEffect(() => {
-    const handleStart = () => {
-      const now = Date.now();
-      setStartTime(now);
-      setElapsed(0);
+    const handleStart = ({ startTimestamp }) => {
+      setStartTime(startTimestamp);
+      setElapsed(Math.max(0, Date.now() - startTimestamp));
       setRunning(true);
     };
 

@@ -40,7 +40,7 @@ export default function FieldManager() {
 
       const { data: results, error: resultsError } = await supabase
         .from("field_results")
-        .select("student_id, distance")
+        .select("student_id, distance, no_result")
         .eq("field_id", fieldId);
 
       if (resultsError) {
@@ -49,8 +49,11 @@ export default function FieldManager() {
       }
 
       const resultsMap = {};
-      results.forEach(r => {
+      const noResultMap = {};
+
+      results.forEach((r) => {
         resultsMap[r.student_id] = r.distance;
+        noResultMap[r.student_id] = !!r.no_result;
       });
 
       const { data: studentsData, error: studentsError } = await supabase
@@ -67,6 +70,14 @@ export default function FieldManager() {
       setDistances(prev => ({
         ...prev,
         [fieldId]: { ...resultsMap, ...prev[fieldId] }
+      }));
+
+      setNoResult(prev => ({
+        ...prev,
+        [fieldId]: {
+          ...noResultMap,
+          ...prev[fieldId],
+        }
       }));
 
       setLockedInputs(prev => ({

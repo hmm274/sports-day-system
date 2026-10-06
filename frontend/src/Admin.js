@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import socket from "./socket";
 
 export default function Admin() {
   const [event, setEvent] = useState("");
@@ -85,59 +86,45 @@ export default function Admin() {
     }
   };
 
-  const saveRace = async () => {
+  const saveRace = () => {
     if (!event || !grade) {
-        alert("Please complete all filters.");
-        return;
+      alert("Please complete all filters.");
+      return;
     }
 
     if (selected.length === 0) {
-        alert("Select at least one student.");
-        return;
+      alert("Select at least one student.");
+      return;
     }
 
     setLoading(true);
 
-    try {
-        const { data: raceData, error: raceError } = await supabase
-        .from("races")
-        .insert([
-            {
-            race_event: event,
-            },
-        ])
-        .select();
+    socket.emit(
+      "create-race",
+      {
+        event,
+        grade,
+        studentIds: selected,
+      },
+      (response) => {
+        setLoading(false);
 
-        if (raceError) throw raceError;
-
-        const race_id = raceData[0].race_id;
-
-        const results = selected.map((student_id, idx) => ({
-        race_id,
-        student_id,
-        lane: idx + 1,
-        time: null,
-        }));
-
-        const { error: resultsError } = await supabase
-        .from("race_results")
-        .insert(results);
-
-        if (resultsError) throw resultsError;
+        if (!response?.success) {
+          console.error(response?.message);
+          alert(response?.message || "Error saving race or results.");
+          return;
+        }
 
         alert("Race and results saved!");
+
         setSelected([]);
         setMaleStudents([]);
         setFemaleStudents([]);
         setEvent("");
         setGrade("");
-    } catch (err) {
-        console.error(err);
-        alert("Error saving race or results.");
-    }
-
-    setLoading(false);
-    };
+      }
+    );
+  };
 
   return (
     <div>

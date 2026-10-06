@@ -415,6 +415,148 @@ io.on('connection', (socket) => {
       });
     }
   });
+
+  socket.on(
+    'create-race',
+    async ({ event, grade, studentIds }, callback) => {
+      // Only the admin can create races
+      if (!isAdmin(socket)) {
+        callback?.({
+          success: false,
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      const validEvents = ['50m', '100m', '200m', '400m'];
+
+      const validGrades =
+        event === '50m' || event === '200m'
+          ? ['G1', 'G2', 'G3', 'G4', 'G5']
+          : ['G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
+
+      // Validate request data
+      if (
+        !validEvents.includes(event) ||
+        !validGrades.includes(grade) ||
+        !Array.isArray(studentIds) ||
+        studentIds.length === 0 ||
+        studentIds.length > 8 ||
+        !studentIds.every(Number.isInteger) ||
+        new Set(studentIds).size !== studentIds.length
+      ) {
+        callback?.({
+          success: false,
+          message: 'Invalid race data',
+        });
+        return;
+      }
+
+      try {
+        // Make sure all selected students actually exist
+        // and belong to the selected grade
+        const { data: students, error: studentsError } = await supabase
+          .from('students')
+          .select('student_id, grade')
+          .in('student_id', studentIds);
+
+        if (studentsError) throw studentsError;
+
+        if (
+          students.length !== studentIds.length ||
+          students.some((student) => student.grade !== grade)
+        ) {
+          callback?.({
+            success: false,
+            message: 'Invalid students selected',
+          });
+          return;
+        }
+
+        // Find all existing races for this event
+        const { data: existingRaces, error: existingRacesError } =
+          await supabase
+            .from('races')
+            .select('race_id')
+            .eq('race_event', event);
+
+        if (existingRacesError) throw existingRacesError;
+
+        // Make sure none of these students are already entered
+        // in another race for this event
+        if (existingRaces.length > 0) {
+          const raceIds = existingRaces.map((race) => race.race_id);
+
+          const { data: existingResults, error: existingResultsError } =
+            await supabase
+              .from('race_results')
+              .select('student_id')
+              .in('race_id', raceIds)
+              .in('student_id', studentIds);
+
+          if (existingResultsError) throw existingResultsError;
+
+          if (existingResults.length > 0) {
+            callback?.({
+              success: false,
+              message:
+                'One or more students are already entered in this event',
+            });
+            return;
+          }
+        }
+
+        // Create the race
+        const { data: raceData, error: raceError } = await supabase
+          .from('races')
+          .insert([
+            {
+              race_event: event,
+            },
+          ])
+          .select('race_id')
+          .single();
+
+        if (raceError) throw raceError;
+
+        // Assign selected students to lanes
+        const results = studentIds.map((studentId, index) => ({
+          race_id: raceData.race_id,
+          student_id: studentId,
+          lane: index + 1,
+          time: null,
+          points: 0,
+          no_result: false,
+        }));
+
+        const { error: resultsError } = await supabase
+          .from('race_results')
+          .insert(results);
+
+        if (resultsError) {
+          // Remove the race if creating its results failed
+          await supabase
+            .from('races')
+            .delete()
+            .eq('race_id', raceData.race_id);
+
+          throw resultsError;
+        }
+
+        callback?.({
+          success: true,
+          raceId: raceData.race_id,
+        });
+      } catch (error) {
+        console.error('Create race error:', error);
+
+        callback?.({
+          success: false,
+          message: 'Unable to create race',
+        });
+      }
+    }
+  );
 });
 
 server.listen(PORT, () => {

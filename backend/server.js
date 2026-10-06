@@ -1,4 +1,5 @@
 require('dotenv').config();
+const supabase = require('./supabaseClient');
 
 const express = require('express');
 const http = require('http');
@@ -190,6 +191,228 @@ io.on('connection', (socket) => {
       console.log(
         `Socket ${socket.id} disconnected, released role "${role}"`
       );
+    }
+  });
+
+  socket.on('save-race-results', async ({ raceId, results }, callback) => {
+    if (!isAdmin(socket)) {
+      callback?.({
+        success: false,
+        message: 'Unauthorized',
+      });
+      return;
+    }
+
+    if (!raceId || !Array.isArray(results) || results.length === 0) {
+      callback?.({
+        success: false,
+        message: 'Invalid race results',
+      });
+      return;
+    }
+
+    try {
+      const validResults = results.filter(
+        (result) =>
+          Number.isInteger(result.lane) &&
+          result.lane >= 1 &&
+          result.lane <= 8 &&
+          Number.isInteger(result.student_id)
+      );
+
+      if (validResults.length !== results.length) {
+        callback?.({
+          success: false,
+          message: 'Invalid race result data',
+        });
+        return;
+      }
+
+      // Rank students who recorded a time.
+      const finishedResults = validResults
+        .filter(
+          (result) =>
+            !result.no_result &&
+            typeof result.time === 'number' &&
+            Number.isFinite(result.time) &&
+            result.time >= 0
+        )
+        .sort((a, b) => a.time - b.time);
+
+      const pointsByPlace = [40, 30, 20, 10, 5];
+
+      const rows = validResults.map((result) => {
+        if (result.no_result) {
+          return {
+            race_id: raceId,
+            lane: result.lane,
+            student_id: result.student_id,
+            time: null,
+            points: 0,
+            no_result: true,
+          };
+        }
+
+        const place = finishedResults.findIndex(
+          (finished) =>
+            finished.lane === result.lane &&
+            finished.student_id === result.student_id
+        );
+
+        if (place === -1) {
+          throw new Error('Invalid race time');
+        }
+
+        return {
+          race_id: raceId,
+          lane: result.lane,
+          student_id: result.student_id,
+          time: result.time,
+          points: pointsByPlace[place] ?? 0,
+          no_result: false,
+        };
+      });
+
+      const { error } = await supabase
+        .from('race_results')
+        .upsert(rows, {
+          onConflict: 'race_id,student_id',
+        });
+
+      if (error) {
+        console.error('Supabase race result error:', error);
+
+        callback?.({
+          success: false,
+          message: 'Unable to save race results',
+        });
+
+        return;
+      }
+
+      callback?.({
+        success: true,
+      });
+    } catch (error) {
+      console.error('Race result save error:', error);
+
+      callback?.({
+        success: false,
+        message: 'Unable to save race results',
+      });
+    }
+  });
+
+  socket.on('save-field-result', async ({ fieldId, studentId, distance, noResult }, callback) => {
+    if (!isAdmin(socket)) {
+      callback?.({
+        success: false,
+        message: 'Unauthorized',
+      });
+      return;
+    }
+
+    if (
+      typeof fieldId !== 'string' ||
+      fieldId.trim() === '' ||
+      !Number.isInteger(studentId)
+    ) {
+      callback?.({
+        success: false,
+        message: 'Invalid field event result',
+      });
+      return;
+    }
+
+    if (
+      !noResult &&
+      (typeof distance !== 'number' ||
+        !Number.isFinite(distance) ||
+        distance < 0)
+    ) {
+      callback?.({
+        success: false,
+        message: 'Invalid distance',
+      });
+      return;
+    }
+
+    try {
+      const { error: upsertError } = await supabase
+        .from('field_results')
+        .upsert(
+          [{
+            field_id: fieldId,
+            student_id: studentId,
+            distance: noResult ? null : distance,
+            points: 0,
+            no_result: !!noResult,
+          }],
+          {
+            onConflict: 'field_id,student_id',
+          }
+        );
+
+      if (upsertError) throw upsertError;
+
+      const { data: results, error: resultsError } = await supabase
+        .from('field_results')
+        .select('student_id, distance, no_result')
+        .eq('field_id', fieldId);
+
+      if (resultsError) throw resultsError;
+
+      const validResults = results
+        .filter(
+          (result) =>
+            !result.no_result &&
+            result.distance !== null
+        )
+        .sort((a, b) => b.distance - a.distance);
+
+      const pointsByPlace = [40, 30, 20, 10, 5];
+
+      const updatedResults = results.map((result) => {
+        if (result.no_result || result.distance === null) {
+          return {
+            field_id: fieldId,
+            student_id: result.student_id,
+            distance: result.distance,
+            no_result: result.no_result,
+            points: 0,
+          };
+        }
+
+        const place = validResults.findIndex(
+          (validResult) =>
+            validResult.student_id === result.student_id
+        );
+
+        return {
+          field_id: fieldId,
+          student_id: result.student_id,
+          distance: result.distance,
+          no_result: false,
+          points: pointsByPlace[place] ?? 0,
+        };
+      });
+
+      const { error: updateError } = await supabase
+        .from('field_results')
+        .upsert(updatedResults, {
+          onConflict: 'field_id,student_id',
+        });
+
+      if (updateError) throw updateError;
+
+      callback?.({ success: true });
+    } catch (error) {
+      console.error('Field result save error:', error);
+
+      callback?.({
+        success: false,
+        message: 'Unable to save field result',
+      });
     }
   });
 });

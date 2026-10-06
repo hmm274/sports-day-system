@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import socket from "./socket";
 
 export default function FieldManager() {
   const [eventType, setEventType] = useState("");
@@ -86,67 +87,56 @@ export default function FieldManager() {
     fetchStudents();
   }, [fieldId, grade, gender]);
 
-  const handleSetDistance = async (studentId) => {
-    const no_result = noResult[fieldId]?.[studentId];
+  const handleSetDistance = (studentId) => {
+    const no_result = !!noResult[fieldId]?.[studentId];
+
     let distance = null;
 
-    if (!no_result){
+    if (!no_result) {
       const rawValue = distances[fieldId]?.[studentId];
-      distance = parseFloat(rawValue?.trim().replace(",", "."));
-      if (isNaN(distance)) return alert("Enter a valid number");
-    }
 
-    const { error: insertError } = await supabase
-        .from("field_results")
-        .upsert([{ field_id: fieldId, student_id: studentId, distance: no_result ? null : distance, points: no_result ? 0 : null, no_result: no_result ? no_result : false }], {
-        onConflict: ["field_id", "student_id"],
-        });
+      distance = parseFloat(
+        String(rawValue ?? "").trim().replace(",", ".")
+      );
 
-    if (insertError) {
-        console.error(insertError);
+      if (!Number.isFinite(distance) || distance < 0) {
+        alert("Enter a valid number");
         return;
+      }
     }
 
-    setLockedInputs(prev => ({
-    ...prev,
-    [fieldId]: { ...prev[fieldId], [studentId]: true }
-    }));
+    socket.emit(
+      "save-field-result",
+      {
+        fieldId,
+        studentId,
+        distance,
+        noResult: no_result,
+      },
+      (response) => {
+        if (!response?.success) {
+          console.error(response?.message);
+          alert(response?.message || "Unable to save field result");
+          return;
+        }
 
-    const { data: results, error: resultsError } = await supabase
-        .from("field_results")
-        .select("student_id, distance")
-        .eq("field_id", fieldId);
-
-    if (resultsError) {
-        console.error(resultsError);
-        return;
-    }
-    const validResults = results.filter(r => !(noResult[fieldId]?.[r.student_id]));
-    const sorted = validResults.sort((a, b) => b.distance - a.distance);
-    const pointsMap = {};
-    sorted.forEach((r, index) => {
-        if (index === 0) pointsMap[r.student_id] = 40;
-        else if (index === 1) pointsMap[r.student_id] = 30;
-        else if (index === 2) pointsMap[r.student_id] = 20;
-        else if (index === 3) pointsMap[r.student_id] = 10;
-        else pointsMap[r.student_id] = 5;
-    });
-
-    for (const sId in pointsMap) {
-        const { error: updateError } = await supabase
-        .from("field_results")
-        .update({ points: pointsMap[sId] })
-        .eq("field_id", fieldId)
-        .eq("student_id", sId);
-
-        if (updateError) console.error(updateError);
-    }
-    };
-
+        setLockedInputs((prev) => ({
+          ...prev,
+          [fieldId]: {
+            ...prev[fieldId],
+            [studentId]: true,
+          },
+        }));
+      }
+    );
+  };
 
   const handleEventType = (target) => {
     setEventType(target);
-    setDistances(prev => ({ ...prev, [fieldId]: {} }));
+    setDistances(prev => ({
+      ...prev,
+      [fieldId]: {}
+    }));
   };
 
   return (
@@ -191,7 +181,7 @@ export default function FieldManager() {
                   type="number"
                   step="0.01"
                   value={distances[fieldId]?.[student.student_id] || ""}
-                  readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.studentId]}
+                  readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.student_id]}
                   onChange={(e) =>
                     setDistances({
                       ...distances,

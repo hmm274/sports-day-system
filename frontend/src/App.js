@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Timer from './Timer';
-import io from 'socket.io-client';
+import socket from "./socket";
 import Admin from './Admin';
 import Races from './Races';
-import { supabase } from './supabaseClient';
 import AdminManageTimer from './AdminManageTimer';
 import HousePoints from './HousePoints';
 import FieldManager from './FieldManager';
 import './App.css';
-
-const socket = io(process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001');
 
 function App() {
   const [role, setRole] = useState('');
@@ -57,58 +54,52 @@ function App() {
   const handleStop = () => {
     socket.emit('stop-all-timers');
   }
-  const handleSave = async (selectedRaceId, timers, fetchRaces, fetchLaneStudents, noResult) => {
+  const handleSave = async (
+    selectedRaceId,
+    timers,
+    fetchRaces,
+    fetchLaneStudents,
+    noResult
+  ) => {
     try {
-      let results = Object.entries(timers).map(([lane, data]) => ({
-        race_id: selectedRaceId,
-        student_id: data.studentId,
+      const results = Object.entries(timers).map(([lane, data]) => ({
         lane: parseInt(lane),
+        student_id: data.studentId,
         time: data.time,
         no_result: !!noResult[lane]
       }));
 
-      results.sort((a, b) => {
-        if (a.no_result && !b.no_result) return 1;
-        if (!a.no_result && b.no_result) return -1;
-        return a.time - b.time
-      });
+      console.log("Sending results:", results);
 
-      results = results.map((res, index) => {
-        if (res.no_result){
-          return {...res, points: 0}
+      socket.emit(
+        'save-race-results',
+        {
+          raceId: selectedRaceId,
+          results
+        },
+        async (response) => {
+          if (!response.success) {
+            console.error("Error saving results:", response.message);
+            alert(response.message || "Failed to save results");
+            return;
+          }
+
+          alert("Results saved!");
+
+          if (fetchRaces) {
+            await fetchRaces();
+          }
+
+          if (fetchLaneStudents) {
+            await fetchLaneStudents();
+          }
+
+          socket.emit("reset-all-timers");
         }
-
-        let points = 5;
-        if (index === 0) points = 40;
-        else if (index === 1) points = 30;
-        else if (index === 2) points = 20;
-        else if (index === 3) points = 10;
-
-        return { ...res, points };
-      });
-
-      console.log("Saving results:", results);
-
-      const { data, error } = await supabase
-        .from('race_results')
-        .upsert(results, { onConflict: ['race_id', 'student_id'] });
-
-      if (error) {
-        console.error("Error saving results:", error);
-        alert("Failed to save results");
-      } else {
-        console.log(data);
-        alert("Results saved!");
-        if (fetchRaces) {
-          await fetchRaces();
-        }
-        if (fetchLaneStudents) {
-          await fetchLaneStudents();
-        }
-        socket.emit("reset-all-timers");
-      }
+      );
     } catch (err) {
       console.error("Unexpected error saving results:", err);
+      alert("Failed to save results");
     }
   };
 

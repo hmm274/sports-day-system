@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import Timer from "./Timer";
 
@@ -14,7 +14,7 @@ const AdminManageTimer = ({
   const [timers, setTimers] = useState({});
   const [noResult, setNoResult] = useState({});
   const [raceStatus, setRaceStatus] = useState("idle");
-  const [activeTimers, setActiveTimers] = useState(0);
+  const [, setActiveTimers] = useState(0);
 
   const [racesLoading, setRacesLoading] = useState(true);
   const [lanesLoading, setLanesLoading] = useState(false);
@@ -126,7 +126,7 @@ const AdminManageTimer = ({
     fetchRaces();
   }, []);
 
-  const fetchLaneStudents = async () => {
+  const fetchLaneStudents = useCallback(async () => {
     if (!selectedRaceId) {
       setLaneStudents([]);
       return;
@@ -170,11 +170,11 @@ const AdminManageTimer = ({
     } finally {
       setLanesLoading(false);
     }
-  };
+  }, [selectedRaceId, socket]);
 
   useEffect(() => {
     fetchLaneStudents();
-  }, [selectedRaceId]);
+  }, [fetchLaneStudents]);
 
   return (
     <div style={{ padding: "20px" }}>

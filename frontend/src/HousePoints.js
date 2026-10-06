@@ -9,56 +9,84 @@ export default function HousePoints() {
     Byakko: 0,
   });
 
+  const [loading, setLoading] = useState(true);
+
   const fetchPoints = async () => {
-    const { data: raceData, error: raceError } = await supabase
-      .from("race_results")
-      .select(`
-        points,
-        student:student_id (
-          house
-        )
-      `);
+    try {
+      const [
+        { data: raceData, error: raceError },
+        { data: fieldData, error: fieldError },
+      ] = await Promise.all([
+        supabase
+          .from("race_results")
+          .select(`
+            points,
+            student:student_id (
+              house
+            )
+          `),
 
-    const {data: fieldData,error: fieldError} = await supabase
-      .from("field_results")
-      .select(`
-        points,
-        student:student_id (
-          house
-        )
-      `);
+        supabase
+          .from("field_results")
+          .select(`
+            points,
+            student:student_id (
+              house
+            )
+          `),
+      ]);
 
-    if (raceError) {
-      console.error("Error fetching points:", raceError);
-      return;
-    }
-    if(fieldError){
-      console.error("Error fetching points: ", fieldError);
-    }
-
-    const totals = { Suzaku: 0, Seiryuu: 0, Genbu: 0, Byakko: 0 };
-
-    raceData?.forEach((result) => {
-      if (result.student?.house) {
-        totals[result.student.house] += result.points || 0;
+      if (raceError) {
+        throw raceError;
       }
-    });
-    fieldData?.forEach((result)=>{
-      if(result.student?.house){
-        totals[result.student.house]+=result.points || 0;
-      }
-    })
 
-    setPoints(totals);
+      if (fieldError) {
+        throw fieldError;
+      }
+
+      const totals = {
+        Suzaku: 0,
+        Seiryuu: 0,
+        Genbu: 0,
+        Byakko: 0,
+      };
+
+      raceData?.forEach((result) => {
+        const house = result.student?.house;
+
+        if (house && house in totals) {
+          totals[house] += result.points || 0;
+        }
+      });
+
+      fieldData?.forEach((result) => {
+        const house = result.student?.house;
+
+        if (house && house in totals) {
+          totals[house] += result.points || 0;
+        }
+      });
+
+      setPoints(totals);
+    } catch (error) {
+      console.error("Error fetching house points:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchPoints();
+
     const raceChannel = supabase
       .channel("race_results-changes")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "race_results" },
+        {
+          event: "*",
+          schema: "public",
+          table: "race_results",
+        },
         () => {
           fetchPoints();
         }
@@ -69,8 +97,12 @@ export default function HousePoints() {
       .channel("field_results-changes")
       .on(
         "postgres_changes",
-        { event:"*", schema:"public", table:"field_results"},
-        ()=>{
+        {
+          event: "*",
+          schema: "public",
+          table: "field_results",
+        },
+        () => {
           fetchPoints();
         }
       )
@@ -82,11 +114,21 @@ export default function HousePoints() {
     };
   }, []);
 
+  if (loading) {
+    return (
+      <div>
+        <h1>Loading house points...</h1>
+      </div>
+    );
+  }
+
   return (
     <div>
       {Object.entries(points).map(([house, score]) => (
         <div key={house}>
-          <h1>{house}: {score}</h1>
+          <h1>
+            {house}: {score}
+          </h1>
         </div>
       ))}
     </div>

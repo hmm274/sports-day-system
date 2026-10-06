@@ -7,14 +7,29 @@ export default function FieldManager() {
   const [grade, setGrade] = useState("");
   const [gender, setGender] = useState("");
   const [fieldId, setFieldId] = useState(null);
+
   const [students, setStudents] = useState([]);
   const [distances, setDistances] = useState({});
   const [lockedInputs, setLockedInputs] = useState({});
   const [noResult, setNoResult] = useState({});
 
+  const [eventLoading, setEventLoading] = useState(false);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [savingStudents, setSavingStudents] = useState({});
+
   useEffect(() => {
     const fetchFieldId = async () => {
-      if (eventType && grade && gender) {
+      if (!eventType || !grade || !gender) {
+        setFieldId(null);
+        setStudents([]);
+        return;
+      }
+
+      setEventLoading(true);
+      setFieldId(null);
+      setStudents([]);
+
+      try {
         const { data, error } = await supabase
           .from("field_events")
           .select("field_id")
@@ -23,11 +38,14 @@ export default function FieldManager() {
           .eq("gender", gender)
           .single();
 
-        if (error) {
-          console.error(error);
-        } else {
-          setFieldId(data.field_id);
-        }
+        if (error) throw error;
+
+        setFieldId(data.field_id);
+      } catch (error) {
+        console.error("Error loading field event:", error);
+        setFieldId(null);
+      } finally {
+        setEventLoading(false);
       }
     };
 
@@ -36,69 +54,81 @@ export default function FieldManager() {
 
   useEffect(() => {
     const fetchStudents = async () => {
-      if (!fieldId) return;
-
-      const { data: results, error: resultsError } = await supabase
-        .from("field_results")
-        .select("student_id, distance, no_result")
-        .eq("field_id", fieldId);
-
-      if (resultsError) {
-        console.error(resultsError);
+      if (!fieldId) {
+        setStudents([]);
         return;
       }
 
-      const resultsMap = {};
-      const noResultMap = {};
+      setStudentsLoading(true);
+      setStudents([]);
 
-      results.forEach((r) => {
-        resultsMap[r.student_id] = r.distance;
-        noResultMap[r.student_id] = !!r.no_result;
-      });
+      try {
+        const { data: results, error: resultsError } = await supabase
+          .from("field_results")
+          .select("student_id, distance, no_result")
+          .eq("field_id", fieldId);
 
-      const { data: studentsData, error: studentsError } = await supabase
-        .from("students")
-        .select("student_id, first_name, last_name")
-        .eq("grade", grade)
-        .eq("sex", gender);
+        if (resultsError) throw resultsError;
 
-      if (studentsError) {
-        console.error(studentsError);
-        return;
+        const resultsMap = {};
+        const noResultMap = {};
+
+        results.forEach((result) => {
+          resultsMap[result.student_id] = result.distance;
+          noResultMap[result.student_id] = !!result.no_result;
+        });
+
+        const { data: studentsData, error: studentsError } = await supabase
+          .from("students")
+          .select("student_id, first_name, last_name")
+          .eq("grade", grade)
+          .eq("sex", gender);
+
+        if (studentsError) throw studentsError;
+
+        setDistances((prev) => ({
+          ...prev,
+          [fieldId]: {
+            ...resultsMap,
+            ...prev[fieldId],
+          },
+        }));
+
+        setNoResult((prev) => ({
+          ...prev,
+          [fieldId]: {
+            ...noResultMap,
+            ...prev[fieldId],
+          },
+        }));
+
+        setLockedInputs((prev) => ({
+          ...prev,
+          [fieldId]: Object.fromEntries(
+            Object.keys(resultsMap).map((id) => [id, true])
+          ),
+        }));
+
+        const merged = studentsData.map((student) => ({
+          ...student,
+          existingResult: resultsMap[student.student_id] ?? null,
+        }));
+
+        setStudents(merged);
+      } catch (error) {
+        console.error("Error loading field students:", error);
+        setStudents([]);
+      } finally {
+        setStudentsLoading(false);
       }
-
-      setDistances(prev => ({
-        ...prev,
-        [fieldId]: { ...resultsMap, ...prev[fieldId] }
-      }));
-
-      setNoResult(prev => ({
-        ...prev,
-        [fieldId]: {
-          ...noResultMap,
-          ...prev[fieldId],
-        }
-      }));
-
-      setLockedInputs(prev => ({
-        ...prev,
-        [fieldId]: Object.fromEntries(
-          Object.keys(resultsMap).map(id => [id, true])
-        )
-      }));
-
-      const merged = studentsData.map(s => ({
-        ...s,
-        existingResult: resultsMap[s.student_id] ?? null,
-      }));
-
-      setStudents(merged);
     };
 
     fetchStudents();
   }, [fieldId, grade, gender]);
 
   const handleSetDistance = (studentId) => {
+    if (savingStudents[studentId]) return;
+
     const no_result = !!noResult[fieldId]?.[studentId];
 
     let distance = null;
@@ -116,6 +146,11 @@ export default function FieldManager() {
       }
     }
 
+    setSavingStudents((prev) => ({
+      ...prev,
+      [studentId]: true,
+    }));
+
     socket.emit(
       "save-field-result",
       {
@@ -125,6 +160,11 @@ export default function FieldManager() {
         noResult: no_result,
       },
       (response) => {
+        setSavingStudents((prev) => ({
+          ...prev,
+          [studentId]: false,
+        }));
+
         if (!response?.success) {
           console.error(response?.message);
           alert(response?.message || "Unable to save field result");
@@ -144,15 +184,13 @@ export default function FieldManager() {
 
   const handleEventType = (target) => {
     setEventType(target);
-    setDistances(prev => ({
-      ...prev,
-      [fieldId]: {}
-    }));
+    setStudents([]);
   };
 
   return (
     <div>
       <h2>Field Event Entry</h2>
+
       <select
         value={eventType}
         onChange={(e) => handleEventType(e.target.value)}
@@ -164,63 +202,134 @@ export default function FieldManager() {
 
       <select
         value={grade}
-        onChange={(e) => setGrade(e.target.value)}
+        onChange={(e) => {
+          setGrade(e.target.value);
+          setStudents([]);
+        }}
       >
         <option value="">Select Grade</option>
-        {["G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12"].map((g) => (
-          <option key={g} value={g}>{g}</option>
+
+        {[
+          "G1",
+          "G2",
+          "G3",
+          "G4",
+          "G5",
+          "G6",
+          "G7",
+          "G8",
+          "G9",
+          "G10",
+          "G11",
+          "G12",
+        ].map((g) => (
+          <option key={g} value={g}>
+            {g}
+          </option>
         ))}
       </select>
 
       <select
         value={gender}
-        onChange={(e) => setGender(e.target.value)}
+        onChange={(e) => {
+          setGender(e.target.value);
+          setStudents([]);
+        }}
       >
         <option value="">Select Gender</option>
         <option value="Male">Male</option>
         <option value="Female">Female</option>
       </select>
 
-      {students.length > 0 && (
+      {eventLoading && <p>Loading event...</p>}
+
+      {!eventLoading && fieldId && studentsLoading && (
+        <p>Loading students...</p>
+      )}
+
+      {!eventLoading &&
+        !studentsLoading &&
+        eventType &&
+        grade &&
+        gender &&
+        fieldId &&
+        students.length === 0 && (
+          <p>No students available.</p>
+        )}
+
+      {!eventLoading && !studentsLoading && students.length > 0 && (
         <div>
           <h3>Enter Distances</h3>
+
           <div className="entries">
-            {students.map((student) => (
-              <div key={student.student_id}>
-                <span>{student.first_name} {student.last_name}</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={distances[fieldId]?.[student.student_id] || ""}
-                  readOnly={lockedInputs[fieldId]?.[student.student_id] || noResult[fieldId]?.[student.student_id]}
-                  onChange={(e) =>
-                    setDistances({
-                      ...distances,
-                      [fieldId]: { ...distances[fieldId], [student.student_id]: e.target.value }
-                    })
-                  }
-                />
-                <label>
+            {students.map((student) => {
+              const studentId = student.student_id;
+              const isLocked =
+                !!lockedInputs[fieldId]?.[studentId];
+              const isNoResult =
+                !!noResult[fieldId]?.[studentId];
+              const isSaving =
+                !!savingStudents[studentId];
+
+              return (
+                <div key={studentId}>
+                  <span>
+                    {student.first_name} {student.last_name}
+                  </span>
+
                   <input
-                    type="checkbox"
-                    checked={noResult[fieldId]?.[student.student_id] || false}
-                    disabled={lockedInputs[fieldId]?.[student.student_id]}
+                    type="number"
+                    step="0.01"
+                    value={
+                      distances[fieldId]?.[studentId] ?? ""
+                    }
+                    readOnly={
+                      isLocked ||
+                      isNoResult ||
+                      isSaving
+                    }
                     onChange={(e) =>
-                      setNoResult(prev => ({
+                      setDistances((prev) => ({
                         ...prev,
-                        [fieldId]: { ...prev[fieldId], [student.student_id]: e.target.checked }
+                        [fieldId]: {
+                          ...prev[fieldId],
+                          [studentId]: e.target.value,
+                        },
                       }))
                     }
-                  />{" "}
-                  No Result
-                </label>
-                {!lockedInputs[fieldId]?.[student.student_id] && (
-                  <button onClick={() => handleSetDistance(student.student_id)}>
-                    Set
-                  </button>
-                )}
-              </div>
-            ))}
+                  />
+
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={isNoResult}
+                      disabled={isLocked || isSaving}
+                      onChange={(e) =>
+                        setNoResult((prev) => ({
+                          ...prev,
+                          [fieldId]: {
+                            ...prev[fieldId],
+                            [studentId]: e.target.checked,
+                          },
+                        }))
+                      }
+                    />{" "}
+                    No Result
+                  </label>
+
+                  {!isLocked && (
+                    <button
+                      onClick={() =>
+                        handleSetDistance(studentId)
+                      }
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "Saving..." : "Set"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

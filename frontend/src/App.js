@@ -11,18 +11,6 @@ import './App.css';
 
 const socket = io(process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001');
 
-const ROLE_PASSCODES = {
-  admin: 'admin123',
-  'lane-1': 'lane1pass',
-  'lane-2': 'lane2pass',
-  'lane-3': 'lane3pass',
-  'lane-4': 'lane4pass',
-  'lane-5': 'lane5pass',
-  'lane-6': 'lane6pass',
-  'lane-7': 'lane7pass',
-  'lane-8': 'lane8pass',
-};
-
 function App() {
   const [role, setRole] = useState('');
   const [passcode, setPasscode] = useState('');
@@ -32,22 +20,35 @@ function App() {
   const [studentInfo, setStudentInfo] = useState({ name: null, house: null });
 
   const handleLogin = () => {
-    if (ROLE_PASSCODES[role] !== passcode) {
-      alert('Incorrect passcode');
+    if (!role) {
+      alert('Please select a role');
       return;
     }
 
-    if(socket.disconnected){
+    if (!passcode) {
+      alert('Please enter a passcode');
+      return;
+    }
+
+    if (socket.disconnected) {
       socket.connect();
     }
 
-    socket.emit('request-role', role, (response) => {
-      if (response.success) {
-        setAuthenticated(true);
-      } else {
-        alert(response.message);
+    socket.emit(
+      'request-role',
+      {
+        role,
+        passcode
+      },
+      (response) => {
+        if (response.success) {
+          setAuthenticated(true);
+          setPasscode('');
+        } else {
+          alert(response.message);
+        }
       }
-    });
+    );
   };
 
   const handleStart = () => {
